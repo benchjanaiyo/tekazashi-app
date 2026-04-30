@@ -4,8 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>手かざし記録アプリ</title>
+    <!-- PWA対応 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="手かざし">
+    <meta name="theme-color" content="#2563eb">
+    <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/391/palms-up-together_1f932.png">
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
@@ -14,9 +19,6 @@
             query, where, getDocs, orderBy }
             from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-        // ======================================================
-        // 🔧 Firebase 設定（ここを自分のプロジェクトの値に書き換える）
-        // ======================================================
         const firebaseConfig = {
             apiKey: "AIzaSyDaEcfyRN0DjWi27zX4AOoNms8pAdl0OqY",
             authDomain: "tekazashi-app.firebaseapp.com",
@@ -25,7 +27,6 @@
             messagingSenderId: "381277813213",
             appId: "1:381277813213:web:034ba91d3a8ceb46e11e34"
         };
-        // ======================================================
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -35,30 +36,23 @@
         let currentUser = null;
         let records = [];
         let receiveRecords = [];
+        let personMemos = [];   // 人別メモ
         let currentCalendarDate = new Date();
         let duplicateInfo = null;
         let editingRecord = null;
+        let editingReceiveRecord = null;
+        let editingMemo = null;
 
-        const typeTimeMap = {
-            'type-8': 10, 'type-7': 6, 'type-6': 6, 'type-1': 10
-        };
-        const receiveTypeTimeMap = {
-            'receive-type-8': 10, 'receive-type-7': 6, 'receive-type-6': 6, 'receive-type-1': 10
-        };
+        const typeTimeMap = { 'type-8': 10, 'type-7': 6, 'type-6': 6, 'type-1': 10 };
+        const receiveTypeTimeMap = { 'receive-type-8': 10, 'receive-type-7': 6, 'receive-type-6': 6, 'receive-type-1': 10 };
 
         // ===================== 認証 =====================
         window.signInWithGoogle = async function() {
-            try {
-                await signInWithPopup(auth, provider);
-            } catch (e) {
-                alert('ログインに失敗しました: ' + e.message);
-            }
+            try { await signInWithPopup(auth, provider); }
+            catch (e) { alert('ログインに失敗しました: ' + e.message); }
         };
-
         window.signOutUser = async function() {
-            if (confirm('ログアウトしますか？')) {
-                await signOut(auth);
-            }
+            if (confirm('ログアウトしますか？')) await signOut(auth);
         };
 
         onAuthStateChanged(auth, async (user) => {
@@ -75,8 +69,7 @@
             } else {
                 document.getElementById('login-screen').classList.remove('hidden');
                 document.getElementById('app-screen').classList.add('hidden');
-                records = [];
-                receiveRecords = [];
+                records = []; receiveRecords = []; personMemos = [];
             }
         });
 
@@ -84,21 +77,14 @@
         async function loadAllData() {
             showLoading(true);
             try {
-                const giveQ = query(
-                    collection(db, 'records'),
-                    where('uid', '==', currentUser.uid),
-                    orderBy('date', 'desc')
-                );
-                const receiveQ = query(
-                    collection(db, 'receiveRecords'),
-                    where('uid', '==', currentUser.uid),
-                    orderBy('date', 'desc')
-                );
-                const [giveSnap, receiveSnap] = await Promise.all([
-                    getDocs(giveQ), getDocs(receiveQ)
+                const [giveSnap, receiveSnap, memoSnap] = await Promise.all([
+                    getDocs(query(collection(db, 'records'), where('uid', '==', currentUser.uid), orderBy('date', 'desc'))),
+                    getDocs(query(collection(db, 'receiveRecords'), where('uid', '==', currentUser.uid), orderBy('date', 'desc'))),
+                    getDocs(query(collection(db, 'personMemos'), where('uid', '==', currentUser.uid), orderBy('memoDate', 'desc')))
                 ]);
                 records = giveSnap.docs.map(d => ({ ...d.data(), id: d.id }));
                 receiveRecords = receiveSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+                personMemos = memoSnap.docs.map(d => ({ ...d.data(), id: d.id }));
             } catch (e) {
                 console.error(e);
                 alert('データの読み込みに失敗しました。\n' + e.message);
@@ -107,8 +93,7 @@
         }
 
         function showLoading(show) {
-            const el = document.getElementById('loading-indicator');
-            if (el) el.classList.toggle('hidden', !show);
+            document.getElementById('loading-indicator').classList.toggle('hidden', !show);
         }
 
         // ===================== 施光記録 =====================
@@ -118,10 +103,7 @@
             const selectedDate = document.getElementById('selected-date').value;
             const types = getSelectedTypes();
             const location = document.getElementById('location').value.trim();
-            if (!personName || !selectedDate) {
-                alert('名前と日付を入力してください');
-                return;
-            }
+            if (!personName || !selectedDate) { alert('名前と日付を入力してください'); return; }
             const isDuplicate = records.some(r => r.person === personName && r.date === selectedDate);
             if (isDuplicate) {
                 duplicateInfo = { person: personName, date: selectedDate, playTime, types, location };
@@ -137,20 +119,14 @@
         async function addRecord(person, playTime, date, types, location) {
             showLoading(true);
             try {
-                const newRecord = {
-                    uid: currentUser.uid,
-                    person, date,
-                    playTime: playTime || null,
-                    types: types || '',
-                    location: location || '',
-                    timestamp: new Date().toISOString()
-                };
+                const newRecord = { uid: currentUser.uid, person, date,
+                    playTime: playTime || null, types: types || '', location: location || '',
+                    timestamp: new Date().toISOString() };
                 const docRef = await addDoc(collection(db, 'records'), newRecord);
                 records.push({ ...newRecord, id: docRef.id });
                 updateDisplay();
-            } catch (e) {
-                alert('保存に失敗しました: ' + e.message);
-            }
+                if (location) saveLocationHistory(location);
+            } catch (e) { alert('保存に失敗しました: ' + e.message); }
             showLoading(false);
         }
 
@@ -169,9 +145,7 @@
                 await deleteDoc(doc(db, 'records', recordId));
                 records = records.filter(r => r.id !== recordId);
                 updateDisplay();
-            } catch (e) {
-                alert('削除に失敗しました: ' + e.message);
-            }
+            } catch (e) { alert('削除に失敗しました: ' + e.message); }
             showLoading(false);
         };
 
@@ -182,7 +156,7 @@
             document.getElementById('edit-playtime').value = record.playTime || '';
             document.getElementById('edit-location').value = record.location || '';
             document.getElementById('edit-custom-type').value = '';
-            ['edit-type-8', 'edit-type-7', 'edit-type-6', 'edit-type-1'].forEach(id =>
+            ['edit-type-8','edit-type-7','edit-type-6','edit-type-1'].forEach(id =>
                 document.getElementById(id).checked = false);
             if (record.types) {
                 record.types.split(' ').forEach(type => {
@@ -212,9 +186,7 @@
                 records = records.map(r => r.id === editingRecord.id ? { ...r, ...updated } : r);
                 updateDisplay();
                 hideEditModal();
-            } catch (e) {
-                alert('更新に失敗しました: ' + e.message);
-            }
+            } catch (e) { alert('更新に失敗しました: ' + e.message); }
             showLoading(false);
         };
 
@@ -225,27 +197,18 @@
             const selectedDate = document.getElementById('receive-selected-date').value;
             const types = getReceiveSelectedTypes();
             const location = document.getElementById('receive-location').value.trim();
-            if (!personName || !selectedDate) {
-                alert('名前と日付を入力してください');
-                return;
-            }
+            if (!personName || !selectedDate) { alert('名前と日付を入力してください'); return; }
             showLoading(true);
             try {
-                const newRecord = {
-                    uid: currentUser.uid,
-                    person: personName, date: selectedDate,
-                    receiveTime: receiveTime || null,
-                    types: types || '',
-                    location: location || '',
-                    timestamp: new Date().toISOString()
-                };
+                const newRecord = { uid: currentUser.uid, person: personName, date: selectedDate,
+                    receiveTime: receiveTime || null, types: types || '', location: location || '',
+                    timestamp: new Date().toISOString() };
                 const docRef = await addDoc(collection(db, 'receiveRecords'), newRecord);
                 receiveRecords.push({ ...newRecord, id: docRef.id });
                 clearReceiveInputs();
                 updateDisplay();
-            } catch (e) {
-                alert('保存に失敗しました: ' + e.message);
-            }
+                if (location) saveLocationHistory(location);
+            } catch (e) { alert('保存に失敗しました: ' + e.message); }
             showLoading(false);
         };
 
@@ -256,82 +219,255 @@
                 await deleteDoc(doc(db, 'receiveRecords', recordId));
                 receiveRecords = receiveRecords.filter(r => r.id !== recordId);
                 updateDisplay();
-            } catch (e) {
-                alert('削除に失敗しました: ' + e.message);
-            }
+            } catch (e) { alert('削除に失敗しました: ' + e.message); }
             showLoading(false);
         };
 
-        // ===================== CSV エクスポート =====================
-        window.exportToCSV = function() {
-            const headers = ['日付', '名前', '施光時間（分）', '施光の種類', '施光場所', '記録日時'];
-            const csvData = [headers];
-            [...records].sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(r => {
-                csvData.push([r.date, r.person, r.playTime || '', r.types || '', r.location || '',
-                    new Date(r.timestamp).toLocaleString('ja-JP')]);
-            });
-            const csvContent = csvData.map(row => row.map(f => '"' + f + '"').join(',')).join('\n');
-            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = '施光記録_' + new Date().toISOString().split('T')[0] + '.csv';
-            link.click();
+        // 受光記録編集
+        window.editReceiveRecord = function(record) {
+            editingReceiveRecord = record;
+            document.getElementById('edit-receive-person').value = record.person;
+            document.getElementById('edit-receive-date').value = record.date;
+            document.getElementById('edit-receive-time').value = record.receiveTime || '';
+            document.getElementById('edit-receive-location').value = record.location || '';
+            document.getElementById('edit-receive-custom-type').value = '';
+            ['edit-receive-type-8','edit-receive-type-7','edit-receive-type-6','edit-receive-type-1'].forEach(id =>
+                document.getElementById(id).checked = false);
+            if (record.types) {
+                record.types.split(' ').forEach(type => {
+                    if (type === '⑧') document.getElementById('edit-receive-type-8').checked = true;
+                    else if (type === '⑦') document.getElementById('edit-receive-type-7').checked = true;
+                    else if (type === '⑥') document.getElementById('edit-receive-type-6').checked = true;
+                    else if (type === '①') document.getElementById('edit-receive-type-1').checked = true;
+                    else if (type) document.getElementById('edit-receive-custom-type').value = type;
+                });
+            }
+            document.getElementById('edit-receive-modal').classList.remove('hidden');
         };
 
-        window.exportReceiveToCSV = function() {
-            const headers = ['日付', '施光者', '受光時間（分）', '受光内容', '場所', '記録日時'];
-            const csvData = [headers];
-            [...receiveRecords].sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(r => {
-                csvData.push([r.date, r.person, r.receiveTime || '', r.types || '', r.location || '',
-                    new Date(r.timestamp).toLocaleString('ja-JP')]);
-            });
-            const csvContent = csvData.map(row => row.map(f => '"' + f + '"').join(',')).join('\n');
-            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = '受光記録_' + new Date().toISOString().split('T')[0] + '.csv';
-            link.click();
+        window.updateReceiveRecord = async function() {
+            if (!editingReceiveRecord) return;
+            let receiveTime = convertToHalfWidth(document.getElementById('edit-receive-time').value);
+            const types = [];
+            if (document.getElementById('edit-receive-type-8').checked) types.push('⑧');
+            if (document.getElementById('edit-receive-type-7').checked) types.push('⑦');
+            if (document.getElementById('edit-receive-type-6').checked) types.push('⑥');
+            if (document.getElementById('edit-receive-type-1').checked) types.push('①');
+            const ct = document.getElementById('edit-receive-custom-type').value.trim();
+            if (ct) types.push(ct);
+            const updated = {
+                person: document.getElementById('edit-receive-person').value,
+                date: document.getElementById('edit-receive-date').value,
+                receiveTime: receiveTime || null,
+                types: types.join(' '),
+                location: document.getElementById('edit-receive-location').value.trim()
+            };
+            showLoading(true);
+            try {
+                await updateDoc(doc(db, 'receiveRecords', editingReceiveRecord.id), updated);
+                receiveRecords = receiveRecords.map(r => r.id === editingReceiveRecord.id ? { ...r, ...updated } : r);
+                updateDisplay();
+                hideEditReceiveModal();
+            } catch (e) { alert('更新に失敗しました: ' + e.message); }
+            showLoading(false);
         };
+
+        window.hideEditReceiveModal = function() {
+            document.getElementById('edit-receive-modal').classList.add('hidden');
+            editingReceiveRecord = null;
+        };
+
+        // ===================== 人別メモ =====================
+        window.showMemoModal = function(personName) {
+            document.getElementById('memo-person-name').textContent = personName;
+            document.getElementById('memo-person-input').value = personName;
+            document.getElementById('memo-date-input').value = getToday();
+            document.getElementById('memo-text-input').value = '';
+            editingMemo = null;
+
+            // その人のメモ一覧を表示
+            renderPersonMemos(personName);
+            document.getElementById('memo-modal').classList.remove('hidden');
+        };
+
+        function renderPersonMemos(personName) {
+            const list = document.getElementById('memo-list');
+            const myMemos = personMemos.filter(m => m.person === personName)
+                .sort((a, b) => b.memoDate.localeCompare(a.memoDate));
+            list.innerHTML = '';
+            if (myMemos.length === 0) {
+                list.innerHTML = '<p class="text-sm text-gray-400 text-center py-4">メモはまだありません</p>';
+                return;
+            }
+            myMemos.forEach(memo => {
+                const div = document.createElement('div');
+                div.className = 'p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-400';
+                div.innerHTML = `
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="flex-1">
+                            <span class="text-xs text-gray-500">${memo.memoDate}</span>
+                            <p class="text-sm text-gray-800 mt-1 whitespace-pre-wrap">${escapeHtml(memo.text)}</p>
+                        </div>
+                        <div class="flex gap-1 shrink-0">
+                            <button onclick="editMemo('${memo.id}')" class="p-1 text-blue-500 hover:bg-blue-100 rounded text-xs">✏️</button>
+                            <button onclick="deleteMemo('${memo.id}', '${escapeHtml(personName)}')" class="p-1 text-red-500 hover:bg-red-100 rounded text-xs">🗑️</button>
+                        </div>
+                    </div>`;
+                list.appendChild(div);
+            });
+        }
+
+        window.saveMemo = async function() {
+            const person = document.getElementById('memo-person-input').value;
+            const memoDate = document.getElementById('memo-date-input').value;
+            const text = document.getElementById('memo-text-input').value.trim();
+            if (!text) { alert('メモを入力してください'); return; }
+            showLoading(true);
+            try {
+                if (editingMemo) {
+                    await updateDoc(doc(db, 'personMemos', editingMemo), { text, memoDate });
+                    personMemos = personMemos.map(m => m.id === editingMemo ? { ...m, text, memoDate } : m);
+                    editingMemo = null;
+                } else {
+                    const newMemo = { uid: currentUser.uid, person, text, memoDate,
+                        timestamp: new Date().toISOString() };
+                    const docRef = await addDoc(collection(db, 'personMemos'), newMemo);
+                    personMemos.push({ ...newMemo, id: docRef.id });
+                }
+                document.getElementById('memo-text-input').value = '';
+                renderPersonMemos(person);
+                updateRecentPeople();
+            } catch (e) { alert('保存に失敗しました: ' + e.message); }
+            showLoading(false);
+        };
+
+        window.editMemo = function(memoId) {
+            const memo = personMemos.find(m => m.id === memoId);
+            if (!memo) return;
+            editingMemo = memoId;
+            document.getElementById('memo-date-input').value = memo.memoDate;
+            document.getElementById('memo-text-input').value = memo.text;
+            document.getElementById('memo-text-input').focus();
+        };
+
+        window.deleteMemo = async function(memoId, personName) {
+            if (!confirm('このメモを削除しますか？')) return;
+            showLoading(true);
+            try {
+                await deleteDoc(doc(db, 'personMemos', memoId));
+                personMemos = personMemos.filter(m => m.id !== memoId);
+                renderPersonMemos(personName);
+                updateRecentPeople();
+            } catch (e) { alert('削除に失敗しました: ' + e.message); }
+            showLoading(false);
+        };
+
+        window.hideMemoModal = function() {
+            document.getElementById('memo-modal').classList.add('hidden');
+            editingMemo = null;
+        };
+
+        // ===================== 場所履歴 =====================
+        function saveLocationHistory(location) {
+            if (!location) return;
+            let history = JSON.parse(localStorage.getItem('locationHistory_' + currentUser.uid) || '[]');
+            history = [location, ...history.filter(h => h !== location)].slice(0, 10);
+            localStorage.setItem('locationHistory_' + currentUser.uid, JSON.stringify(history));
+        }
+
+        function getLocationHistory() {
+            return JSON.parse(localStorage.getItem('locationHistory_' + currentUser.uid) || '[]');
+        }
+
+        function setupLocationSuggestion(inputId, suggestId) {
+            const input = document.getElementById(inputId);
+            const suggest = document.getElementById(suggestId);
+            input.addEventListener('focus', () => showSuggestions(input, suggest));
+            input.addEventListener('input', () => showSuggestions(input, suggest));
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !suggest.contains(e.target))
+                    suggest.classList.add('hidden');
+            });
+        }
+
+        function showSuggestions(input, suggest) {
+            const history = getLocationHistory();
+            const val = input.value.trim();
+            const filtered = val ? history.filter(h => h.includes(val)) : history;
+            if (filtered.length === 0) { suggest.classList.add('hidden'); return; }
+            suggest.innerHTML = '';
+            filtered.forEach(loc => {
+                const div = document.createElement('div');
+                div.className = 'px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm';
+                div.textContent = loc;
+                div.onclick = () => { input.value = loc; suggest.classList.add('hidden'); };
+                suggest.appendChild(div);
+            });
+            suggest.classList.remove('hidden');
+        }
+
+        // ===================== CSV エクスポート =====================
+        window.exportToCSV = function() {
+            const headers = ['日付','名前','施光時間（分）','施光の種類','施光場所','記録日時'];
+            const rows = [headers, ...[...records].sort((a,b) => b.date.localeCompare(a.date))
+                .map(r => [r.date, r.person, r.playTime||'', r.types||'', r.location||'',
+                    new Date(r.timestamp).toLocaleString('ja-JP')])];
+            downloadCSV(rows, '施光記録_' + getToday() + '.csv');
+        };
+        window.exportReceiveToCSV = function() {
+            const headers = ['日付','施光者','受光時間（分）','受光内容','場所','記録日時'];
+            const rows = [headers, ...[...receiveRecords].sort((a,b) => b.date.localeCompare(a.date))
+                .map(r => [r.date, r.person, r.receiveTime||'', r.types||'', r.location||'',
+                    new Date(r.timestamp).toLocaleString('ja-JP')])];
+            downloadCSV(rows, '受光記録_' + getToday() + '.csv');
+        };
+        function downloadCSV(rows, filename) {
+            const csv = rows.map(r => r.map(f => '"'+f+'"').join(',')).join('\n');
+            const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+        }
 
         // ===================== ヘルパー =====================
         function convertToHalfWidth(str) {
             if (!str) return str;
             return str.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
         }
-
+        function escapeHtml(str) {
+            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
         function getSelectedTypes() {
-            const types = [];
-            if (document.getElementById('type-8').checked) types.push('⑧');
-            if (document.getElementById('type-7').checked) types.push('⑦');
-            if (document.getElementById('type-6').checked) types.push('⑥');
-            if (document.getElementById('type-1').checked) types.push('①');
+            const t = [];
+            ['type-8','type-7','type-6','type-1'].forEach(id => {
+                if (document.getElementById(id).checked)
+                    t.push(document.getElementById(id).value);
+            });
             const ct = document.getElementById('custom-type').value.trim();
-            if (ct) types.push(ct);
-            return types.join(' ');
+            if (ct) t.push(ct);
+            return t.join(' ');
         }
-
         function getReceiveSelectedTypes() {
-            const types = [];
-            if (document.getElementById('receive-type-8').checked) types.push('⑧');
-            if (document.getElementById('receive-type-7').checked) types.push('⑦');
-            if (document.getElementById('receive-type-6').checked) types.push('⑥');
-            if (document.getElementById('receive-type-1').checked) types.push('①');
+            const t = [];
+            ['receive-type-8','receive-type-7','receive-type-6','receive-type-1'].forEach(id => {
+                if (document.getElementById(id).checked)
+                    t.push(document.getElementById(id).value);
+            });
             const ct = document.getElementById('receive-custom-type').value.trim();
-            if (ct) types.push(ct);
-            return types.join(' ');
+            if (ct) t.push(ct);
+            return t.join(' ');
         }
-
         function getEditSelectedTypes() {
-            const types = [];
-            if (document.getElementById('edit-type-8').checked) types.push('⑧');
-            if (document.getElementById('edit-type-7').checked) types.push('⑦');
-            if (document.getElementById('edit-type-6').checked) types.push('⑥');
-            if (document.getElementById('edit-type-1').checked) types.push('①');
+            const t = [];
+            ['edit-type-8','edit-type-7','edit-type-6','edit-type-1'].forEach(id => {
+                if (document.getElementById(id).checked)
+                    t.push(document.getElementById(id).value);
+            });
             const ct = document.getElementById('edit-custom-type').value.trim();
-            if (ct) types.push(ct);
-            return types.join(' ');
+            if (ct) t.push(ct);
+            return t.join(' ');
         }
-
         function clearInputs() {
             document.getElementById('person-name').value = '';
             document.getElementById('play-time').value = '10';
@@ -339,7 +475,6 @@
             document.getElementById('custom-type').value = '';
             document.getElementById('location').value = '';
         }
-
         function clearReceiveInputs() {
             document.getElementById('receive-person').value = '';
             document.getElementById('receive-time').value = '10';
@@ -348,15 +483,11 @@
             document.getElementById('receive-custom-type').value = '';
             document.getElementById('receive-location').value = '';
         }
-
         function setTodayDate() {
-            const now = new Date();
-            const jst = new Date(now.getTime() + (9 * 60 - now.getTimezoneOffset()) * 60000);
-            const today = jst.toISOString().split('T')[0];
+            const today = getToday();
             document.getElementById('selected-date').value = today;
             document.getElementById('receive-selected-date').value = today;
         }
-
         function getToday() {
             const now = new Date();
             const jst = new Date(now.getTime() + (9 * 60 - now.getTimezoneOffset()) * 60000);
@@ -382,22 +513,19 @@
                 peopleStats[r.person].count++;
                 if (r.playTime) peopleStats[r.person].totalTime += parseInt(r.playTime) || 0;
             });
-
             const peopleStatsDiv = document.getElementById('people-stats');
             if (peopleStatsDiv) {
                 peopleStatsDiv.innerHTML = '';
                 Object.entries(peopleStats).sort(([,a],[,b]) => b.count - a.count).forEach(([person, stats]) => {
                     const div = document.createElement('div');
                     div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded';
-                    div.innerHTML = `<span class="font-medium">${person}</span><div class="flex gap-4 text-sm text-gray-600"><span>${stats.count}回</span>${stats.totalTime > 0 ? `<span>計${stats.totalTime}分</span>` : ''}</div>`;
+                    div.innerHTML = `<span class="font-medium">${escapeHtml(person)}</span><div class="flex gap-4 text-sm text-gray-600"><span>${stats.count}回</span>${stats.totalTime > 0 ? `<span>計${stats.totalTime}分</span>` : ''}</div>`;
                     peopleStatsDiv.appendChild(div);
                 });
             }
-
             const monthlyStats = {};
             records.forEach(r => {
-                const d = new Date(r.date);
-                const key = d.getFullYear() + '-' + (d.getMonth() + 1);
+                const key = r.date.substring(0, 7);
                 monthlyStats[key] = (monthlyStats[key] || 0) + 1;
             });
             const monthlyStatsDiv = document.getElementById('monthly-stats');
@@ -410,8 +538,7 @@
                     monthlyStatsDiv.appendChild(div);
                 });
             }
-
-            const totalTime = records.reduce((s, r) => s + (parseInt(r.playTime) || 0), 0);
+            const totalTime = records.reduce((s,r) => s + (parseInt(r.playTime)||0), 0);
             const statsTotal = document.getElementById('stats-total-records');
             const statsTime = document.getElementById('stats-total-time');
             if (statsTotal) statsTotal.textContent = total + '回';
@@ -419,24 +546,41 @@
         }
 
         function updateRecentPeople() {
-            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
             const recentCounts = {};
             records.forEach(r => {
-                if (new Date(r.date) >= thirtyDaysAgo)
+                if (r.date >= thirtyDaysAgo)
                     recentCounts[r.person] = (recentCounts[r.person] || 0) + 1;
             });
             const allPeople = [...new Set(records.map(r => r.person))];
             const sorted = allPeople.map(n => ({ name: n, count: recentCounts[n] || 0 }))
-                .sort((a, b) => b.count - a.count);
+                .sort((a,b) => b.count - a.count);
             const div = document.getElementById('recent-people');
             if (!div) return;
             div.innerHTML = '';
             sorted.forEach(({ name, count }) => {
+                const myMemoCount = personMemos.filter(m => m.person === name).length;
+                const latestMemo = personMemos.filter(m => m.person === name)
+                    .sort((a,b) => b.memoDate.localeCompare(a.memoDate))[0];
                 const btn = document.createElement('button');
-                btn.className = 'px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-sm flex items-center gap-1';
+                btn.className = 'flex items-center gap-1 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full text-sm';
                 btn.onclick = () => { document.getElementById('person-name').value = name; };
-                btn.innerHTML = name + (count > 0 ? `<span class="text-xs bg-blue-100 text-blue-800 px-1 rounded">${count}</span>` : '');
-                div.appendChild(btn);
+                btn.innerHTML = escapeHtml(name) +
+                    (count > 0 ? `<span class="text-xs bg-blue-100 text-blue-800 px-1 rounded">${count}</span>` : '');
+
+                // メモボタン
+                const memoBtn = document.createElement('button');
+                memoBtn.className = 'ml-1 text-xs px-1.5 py-0.5 rounded ' +
+                    (myMemoCount > 0 ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-200 text-gray-500');
+                memoBtn.title = latestMemo ? latestMemo.memoDate + ': ' + latestMemo.text.substring(0,30) : 'メモなし';
+                memoBtn.textContent = '📝' + (myMemoCount > 0 ? myMemoCount : '');
+                memoBtn.onclick = (e) => { e.stopPropagation(); showMemoModal(name); };
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex items-center gap-1';
+                wrapper.appendChild(btn);
+                wrapper.appendChild(memoBtn);
+                div.appendChild(wrapper);
             });
         }
 
@@ -453,18 +597,19 @@
                 todaysRecords.forEach(record => {
                     const div = document.createElement('div');
                     div.className = 'p-3 bg-blue-50 rounded-lg flex items-center justify-between border-l-4 border-blue-500';
-                    div.innerHTML = `<div class="flex flex-wrap items-center gap-2">
-                        <span class="font-medium">${record.person}</span>
-                        ${record.playTime ? `<span class="text-sm text-gray-600">🕐 ${record.playTime}分</span>` : ''}
-                        ${record.types ? `<span class="text-sm text-blue-600">📝 ${record.types}</span>` : ''}
-                        ${record.location ? `<span class="text-sm text-green-600">📍 ${record.location}</span>` : ''}
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <button onclick='editRecord(${JSON.stringify(record).replace(/'/g,"\\'")})'
-                            class="p-2 text-blue-600 hover:bg-blue-100 rounded" title="編集">✏️</button>
-                        <button onclick="deleteRecord('${record.id}')"
-                            class="p-2 text-red-600 hover:bg-red-100 rounded" title="削除">🗑️</button>
-                    </div>`;
+                    div.innerHTML = `
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-medium">${escapeHtml(record.person)}</span>
+                            ${record.playTime ? `<span class="text-sm text-gray-600">🕐 ${record.playTime}分</span>` : ''}
+                            ${record.types ? `<span class="text-sm text-blue-600">📝 ${record.types}</span>` : ''}
+                            ${record.location ? `<span class="text-sm text-green-600">📍 ${escapeHtml(record.location)}</span>` : ''}
+                        </div>
+                        <div class="flex items-center gap-1 shrink-0">
+                            <button onclick='editRecord(${JSON.stringify(record).replace(/'/g,"\\'")})'
+                                class="p-2 text-blue-600 hover:bg-blue-100 rounded">✏️</button>
+                            <button onclick="deleteRecord('${record.id}')"
+                                class="p-2 text-red-600 hover:bg-red-100 rounded">🗑️</button>
+                        </div>`;
                     list.appendChild(div);
                 });
             } else {
@@ -485,16 +630,19 @@
                 todaysRecords.forEach(record => {
                     const div = document.createElement('div');
                     div.className = 'p-3 bg-green-50 rounded-lg flex items-center justify-between border-l-4 border-green-500';
-                    div.innerHTML = `<div class="flex flex-wrap items-center gap-2">
-                        <span class="font-medium">${record.person}から受光</span>
-                        ${record.receiveTime ? `<span class="text-sm text-gray-600">🕐 ${record.receiveTime}分</span>` : ''}
-                        ${record.types ? `<span class="text-sm text-green-600">📝 ${record.types}</span>` : ''}
-                        ${record.location ? `<span class="text-sm text-green-600">📍 ${record.location}</span>` : ''}
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        <button onclick="deleteReceiveRecord('${record.id}')"
-                            class="p-2 text-red-600 hover:bg-red-100 rounded" title="削除">🗑️</button>
-                    </div>`;
+                    div.innerHTML = `
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-medium">${escapeHtml(record.person)}から受光</span>
+                            ${record.receiveTime ? `<span class="text-sm text-gray-600">🕐 ${record.receiveTime}分</span>` : ''}
+                            ${record.types ? `<span class="text-sm text-green-600">📝 ${record.types}</span>` : ''}
+                            ${record.location ? `<span class="text-sm text-green-600">📍 ${escapeHtml(record.location)}</span>` : ''}
+                        </div>
+                        <div class="flex items-center gap-1 shrink-0">
+                            <button onclick='editReceiveRecord(${JSON.stringify(record).replace(/'/g,"\\'")})'
+                                class="p-2 text-green-600 hover:bg-green-100 rounded">✏️</button>
+                            <button onclick="deleteReceiveRecord('${record.id}')"
+                                class="p-2 text-red-600 hover:bg-red-100 rounded">🗑️</button>
+                        </div>`;
                     list.appendChild(div);
                 });
             } else {
@@ -509,36 +657,34 @@
             const today = getToday();
             document.getElementById('calendar-title').textContent = year + '年' + (month + 1) + '月';
             const firstDay = new Date(year, month, 1);
-            const startDate = new Date(year, month, 1);
-            startDate.setDate(startDate.getDate() - firstDay.getDay());
+            const startDate = new Date(year, month, 1 - firstDay.getDay());
             const calendarDays = document.getElementById('calendar-days');
             calendarDays.innerHTML = '';
             for (let i = 0; i < 42; i++) {
                 const cur = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i);
                 const dateStr = cur.getFullYear() + '-' +
-                    String(cur.getMonth() + 1).padStart(2, '0') + '-' +
-                    String(cur.getDate()).padStart(2, '0');
+                    String(cur.getMonth()+1).padStart(2,'0') + '-' +
+                    String(cur.getDate()).padStart(2,'0');
                 const dayRecords = records.filter(r => r.date === dateStr);
                 const dayReceive = receiveRecords.filter(r => r.date === dateStr);
                 const isCurrentMonth = cur.getMonth() === month;
-                const isToday = dateStr === today;
                 const dayDiv = document.createElement('div');
-                dayDiv.className = 'calendar-day p-2 ' +
+                dayDiv.className = 'calendar-day p-1 ' +
                     (!isCurrentMonth ? 'bg-gray-50 text-gray-400 ' : '') +
-                    (isToday ? 'today ' : '');
+                    (dateStr === today ? 'today ' : '');
                 if (isCurrentMonth) dayDiv.onclick = () => selectCalendarDate(dateStr);
                 const dayContent = document.createElement('div');
                 dayContent.className = 'text-sm font-medium mb-1';
                 dayContent.textContent = cur.getDate();
                 const rc = document.createElement('div');
-                rc.className = 'space-y-1';
-                [...new Set(dayRecords.map(r => r.person))].slice(0, 2).forEach(p => {
+                rc.className = 'space-y-0.5';
+                [...new Set(dayRecords.map(r => r.person))].slice(0,2).forEach(p => {
                     const d = document.createElement('div');
                     d.className = 'text-xs px-1 py-0.5 bg-blue-100 text-blue-800 rounded truncate';
                     d.textContent = '🤲' + p;
                     rc.appendChild(d);
                 });
-                [...new Set(dayReceive.map(r => r.person))].slice(0, 2).forEach(p => {
+                [...new Set(dayReceive.map(r => r.person))].slice(0,2).forEach(p => {
                     const d = document.createElement('div');
                     d.className = 'text-xs px-1 py-0.5 bg-green-100 text-green-800 rounded truncate';
                     d.textContent = '🌟' + p;
@@ -563,41 +709,17 @@
             showView('give');
             setTimeout(updateTodaysGiveRecords, 100);
         }
-
-        window.previousMonth = function() {
-            currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
-            updateCalendar();
-        };
-        window.nextMonth = function() {
-            currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
-            updateCalendar();
-        };
-        window.currentMonth = function() {
-            currentCalendarDate = new Date();
-            updateCalendar();
-        };
+        window.previousMonth = () => { currentCalendarDate.setMonth(currentCalendarDate.getMonth()-1); updateCalendar(); };
+        window.nextMonth = () => { currentCalendarDate.setMonth(currentCalendarDate.getMonth()+1); updateCalendar(); };
+        window.currentMonth = () => { currentCalendarDate = new Date(); updateCalendar(); };
 
         // ===================== モーダル =====================
-        window.hideEditModal = function() {
-            document.getElementById('edit-modal').classList.add('hidden');
-            editingRecord = null;
-        };
-        window.hideDuplicateModal = function() {
-            document.getElementById('duplicate-modal').classList.add('hidden');
-            duplicateInfo = null;
-        };
-        window.showImportModal = function() {
-            document.getElementById('import-modal').classList.remove('hidden');
-        };
-        window.hideImportModal = function() {
-            document.getElementById('import-modal').classList.add('hidden');
-            document.getElementById('import-data').value = '';
-        };
-        window.closeAllModals = function() {
-            ['import-modal','edit-modal','duplicate-modal'].forEach(id =>
+        window.hideEditModal = () => { document.getElementById('edit-modal').classList.add('hidden'); editingRecord = null; };
+        window.hideDuplicateModal = () => { document.getElementById('duplicate-modal').classList.add('hidden'); duplicateInfo = null; };
+        window.closeAllModals = () => {
+            ['import-modal','edit-modal','duplicate-modal','memo-modal','edit-receive-modal'].forEach(id =>
                 document.getElementById(id).classList.add('hidden'));
-            editingRecord = null;
-            duplicateInfo = null;
+            editingRecord = null; duplicateInfo = null; editingMemo = null; editingReceiveRecord = null;
         };
 
         // ===================== タブ切り替え =====================
@@ -618,11 +740,9 @@
 
         // ===================== ダークモード =====================
         window.toggleDarkMode = function() {
-            const body = document.body;
-            const isDark = body.classList.contains('dark');
-            body.classList.toggle('dark', !isDark);
-            document.getElementById('dark-mode-btn').textContent = isDark ? '🌙 ダークモード' : '☀️ ライトモード';
-            localStorage.setItem('darkMode', !isDark);
+            const isDark = document.body.classList.toggle('dark');
+            document.getElementById('dark-mode-btn').textContent = isDark ? '☀️ ライトモード' : '🌙 ダークモード';
+            localStorage.setItem('darkMode', isDark);
         };
 
         // ===================== 時間自動計算 =====================
@@ -641,10 +761,9 @@
             if (total > 0) document.getElementById('receive-time').value = total;
         };
 
-        // ===================== DOM 準備完了後の初期化 =====================
+        // ===================== 初期化 =====================
         document.addEventListener('DOMContentLoaded', () => {
-            const isDarkMode = localStorage.getItem('darkMode') === 'true';
-            if (isDarkMode) {
+            if (localStorage.getItem('darkMode') === 'true') {
                 document.body.classList.add('dark');
                 document.getElementById('dark-mode-btn').textContent = '☀️ ライトモード';
             }
@@ -661,7 +780,13 @@
             document.addEventListener('click', e => {
                 if (e.target.classList.contains('modal')) closeAllModals();
             });
+            // 場所履歴サジェスト
+            setupLocationSuggestion('location', 'location-suggest');
+            setupLocationSuggestion('receive-location', 'receive-location-suggest');
         });
+
+        // Firestoreのセキュリティルール用：personMemosにもインデックスが必要
+        // uid + memoDate (desc) のインデックスを作成してください
     </script>
     <style>
         .hidden { display: none !important; }
@@ -676,50 +801,40 @@
         .checkbox-item { display: flex; align-items: center; gap: 5px; }
         .checkbox-item input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
         .checkbox-item label { font-size: 16px; font-weight: 500; cursor: pointer; }
-
-        /* ダークモード */
+        .location-wrapper { position: relative; }
+        .location-suggest { position: absolute; top: 100%; left: 0; right: 0; background: white;
+            border: 1px solid #d1d5db; border-radius: 6px; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .dark { background-color: #1f2937; color: #f9fafb; }
         .dark .bg-white { background-color: #374151 !important; color: #f9fafb !important; }
         .dark .bg-gray-50 { background-color: #4b5563 !important; }
         .dark .text-gray-800 { color: #f9fafb !important; }
         .dark .text-gray-700 { color: #e5e7eb !important; }
         .dark .text-gray-600 { color: #d1d5db !important; }
-        .dark .border-gray-200 { border-color: #4b5563 !important; }
-        .dark .border-gray-300 { border-color: #6b7280 !important; }
+        .dark .border-gray-200, .dark .border-gray-300 { border-color: #4b5563 !important; }
         .dark input, .dark textarea { background-color: #4b5563 !important; color: #f9fafb !important; border-color: #6b7280 !important; }
         .dark .bg-blue-50 { background-color: #1e3a8a !important; }
         .dark .bg-green-50 { background-color: #14532d !important; }
+        .dark .bg-yellow-50 { background-color: #78350f !important; }
         .dark .bg-gray-100 { background-color: #4b5563 !important; }
         .dark .calendar-day.today { background-color: #1e3a8a !important; border: 2px solid #60a5fa !important; }
-        .dark .calendar-day:hover { background-color: #374151; }
-
-        /* スマホ対応 */
+        .dark .location-suggest { background: #374151; border-color: #4b5563; }
+        .dark .location-suggest div:hover { background-color: #4b5563; }
         @media (max-width: 640px) {
             .tab-bar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-            .tab-bar button { white-space: nowrap; font-size: 13px; padding: 8px 12px; }
-            .calendar-day { min-height: 50px; font-size: 12px; }
+            .tab-bar button { white-space: nowrap; font-size: 12px; padding: 7px 10px; }
+            .calendar-day { min-height: 50px; font-size: 11px; }
         }
-
-        /* ローディング */
-        #loading-indicator {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        #loading-indicator { position: fixed; top: 0; left: 0; right: 0; bottom: 0;
             background: rgba(0,0,0,0.3); display: flex; align-items: center;
-            justify-content: center; z-index: 9999;
-        }
-        .spinner {
-            width: 48px; height: 48px; border: 5px solid #fff;
-            border-top-color: #3b82f6; border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
+            justify-content: center; z-index: 9999; }
+        .spinner { width: 48px; height: 48px; border: 5px solid #fff;
+            border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="bg-gray-50">
 
-<!-- ローディング -->
-<div id="loading-indicator" class="hidden">
-    <div class="spinner"></div>
-</div>
+<div id="loading-indicator" class="hidden"><div class="spinner"></div></div>
 
 <!-- ログイン画面 -->
 <div id="login-screen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -739,7 +854,6 @@
 <!-- アプリ本体 -->
 <div id="app-screen" class="hidden max-w-3xl mx-auto p-4 bg-white min-h-screen">
 
-    <!-- ヘッダー -->
     <div class="mb-6 flex justify-between items-center flex-wrap gap-3">
         <div>
             <h1 class="text-2xl font-bold text-gray-800">🤲 手かざし記録</h1>
@@ -747,9 +861,7 @@
         </div>
         <div class="flex items-center gap-3">
             <button onclick="toggleDarkMode()" id="dark-mode-btn"
-                class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
-                🌙 ダークモード
-            </button>
+                class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">🌙 ダークモード</button>
             <div class="flex items-center gap-2">
                 <img id="user-avatar" class="w-7 h-7 rounded-full hidden" src="" alt="">
                 <span id="user-name" class="text-sm text-gray-600 max-w-[120px] truncate"></span>
@@ -758,19 +870,13 @@
         </div>
     </div>
 
-    <!-- タブ -->
     <div class="mb-6">
         <div class="tab-bar flex space-x-1 bg-gray-100 p-1 rounded-lg">
-            <button onclick="showView('give')" id="tab-give"
-                class="px-4 py-2 rounded-md font-medium transition-colors bg-white text-blue-600 shadow-sm text-sm">施光記録</button>
-            <button onclick="showView('receive')" id="tab-receive"
-                class="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 hover:text-gray-800 text-sm">受光記録</button>
-            <button onclick="showView('calendar')" id="tab-calendar"
-                class="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 hover:text-gray-800 text-sm">カレンダー</button>
-            <button onclick="showView('stats')" id="tab-stats"
-                class="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 hover:text-gray-800 text-sm">統計</button>
-            <button onclick="showView('data')" id="tab-data"
-                class="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 hover:text-gray-800 text-sm">データ</button>
+            <button onclick="showView('give')" id="tab-give" class="px-4 py-2 rounded-md font-medium transition-colors bg-white text-blue-600 shadow-sm text-sm">施光記録</button>
+            <button onclick="showView('receive')" id="tab-receive" class="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 text-sm">受光記録</button>
+            <button onclick="showView('calendar')" id="tab-calendar" class="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 text-sm">カレンダー</button>
+            <button onclick="showView('stats')" id="tab-stats" class="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 text-sm">統計</button>
+            <button onclick="showView('data')" id="tab-data" class="px-4 py-2 rounded-md font-medium transition-colors text-gray-600 text-sm">データ</button>
         </div>
     </div>
 
@@ -780,20 +886,15 @@
             <span class="text-sm font-medium text-blue-600">📊 総施光人数</span>
             <p class="text-2xl font-bold text-blue-800" id="total-records">0</p>
         </div>
-
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">📅 日付</label>
-            <input type="date" id="selected-date"
-                class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto">
+            <input type="date" id="selected-date" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-full">
         </div>
-
         <div class="mb-6 space-y-3">
             <label class="block text-sm font-medium text-gray-700">➕ 施光記録を追加</label>
             <div class="flex gap-2">
-                <input type="text" id="person-name" placeholder="名前を入力"
-                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <input type="text" id="play-time" value="10" placeholder="時間(分)"
-                    class="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" id="person-name" placeholder="名前を入力" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="text" id="play-time" value="10" placeholder="時間(分)" class="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">施光の種類</label>
@@ -803,23 +904,22 @@
                     <div class="checkbox-item"><input type="checkbox" id="type-6" value="⑥"><label for="type-6">⑥</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="type-1" value="①"><label for="type-1">①</label></div>
                 </div>
-                <input type="text" id="custom-type" placeholder="その他を入力"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm mt-2">
+                <input type="text" id="custom-type" placeholder="その他を入力" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm mt-2">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">施光場所</label>
-                <input type="text" id="location" placeholder="例：自宅、道場、外出先"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="location-wrapper">
+                    <input type="text" id="location" placeholder="例：自宅、道場、外出先" autocomplete="off"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <div id="location-suggest" class="location-suggest hidden"></div>
+                </div>
             </div>
-            <button onclick="addNewPerson()"
-                class="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium text-base">追加</button>
+            <button onclick="addNewPerson()" class="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium text-base">追加</button>
         </div>
-
         <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">👥 よく施光する人</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">👥 よく施光する人 <span class="text-xs text-gray-400">（📝でメモを確認・追加）</span></label>
             <div id="recent-people" class="flex flex-wrap gap-2"></div>
         </div>
-
         <div id="todays-give-records" class="mb-6 hidden">
             <h3 class="text-lg font-semibold text-gray-800 mb-3" id="give-records-title">施光記録</h3>
             <div id="give-records-list" class="space-y-2"></div>
@@ -830,17 +930,13 @@
     <div id="view-receive" class="hidden">
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">📅 日付</label>
-            <input type="date" id="receive-selected-date"
-                class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 w-full sm:w-auto">
+            <input type="date" id="receive-selected-date" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 w-full">
         </div>
-
         <div class="mb-6 space-y-3">
             <label class="block text-sm font-medium text-gray-700">🌟 受光記録を追加</label>
             <div class="flex gap-2">
-                <input type="text" id="receive-person" placeholder="施光してくれた人の名前"
-                    class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
-                <input type="text" id="receive-time" value="10" placeholder="時間(分)"
-                    class="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                <input type="text" id="receive-person" placeholder="施光してくれた人の名前" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                <input type="text" id="receive-time" value="10" placeholder="時間(分)" class="w-20 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">受光内容</label>
@@ -850,18 +946,18 @@
                     <div class="checkbox-item"><input type="checkbox" id="receive-type-6" value="⑥"><label for="receive-type-6">⑥</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="receive-type-1" value="①"><label for="receive-type-1">①</label></div>
                 </div>
-                <input type="text" id="receive-custom-type" placeholder="その他を入力"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-sm mt-2">
+                <input type="text" id="receive-custom-type" placeholder="その他を入力" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-sm mt-2">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">受光場所</label>
-                <input type="text" id="receive-location" placeholder="例：自宅、道場、外出先"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                <div class="location-wrapper">
+                    <input type="text" id="receive-location" placeholder="例：自宅、道場、外出先" autocomplete="off"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <div id="receive-location-suggest" class="location-suggest hidden"></div>
+                </div>
             </div>
-            <button onclick="addReceiveRecord()"
-                class="w-full px-4 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium text-base">受光記録を追加</button>
+            <button onclick="addReceiveRecord()" class="w-full px-4 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-medium text-base">受光記録を追加</button>
         </div>
-
         <div id="todays-receive-records" class="mb-6 hidden">
             <h3 class="text-lg font-semibold text-gray-800 mb-3" id="receive-records-title">受光記録</h3>
             <div id="receive-records-list" class="space-y-2"></div>
@@ -920,17 +1016,15 @@
         <h2 class="text-xl font-semibold text-gray-800 mb-6">データ管理</h2>
         <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
             <h3 class="text-base font-semibold text-gray-800 mb-2">CSVエクスポート</h3>
-            <p class="text-sm text-gray-600 mb-4">記録をCSVファイルでダウンロードできます。バックアップとして定期的に保存することをおすすめします。</p>
+            <p class="text-sm text-gray-600 mb-4">記録をCSVファイルでダウンロードできます。定期的なバックアップをおすすめします。</p>
             <div class="flex flex-wrap gap-3">
-                <button onclick="exportToCSV()"
-                    class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-                    📥 施光記録をダウンロード
-                </button>
-                <button onclick="exportReceiveToCSV()"
-                    class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-                    📥 受光記録をダウンロード
-                </button>
+                <button onclick="exportToCSV()" class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">📥 施光記録</button>
+                <button onclick="exportReceiveToCSV()" class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">📥 受光記録</button>
             </div>
+        </div>
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 class="text-sm font-semibold text-blue-800 mb-1">📱 iPhoneホーム画面への追加方法</h3>
+            <p class="text-sm text-blue-700">Safariで開いた状態で、画面下の「共有」ボタン →「ホーム画面に追加」をタップすると、アプリのように使えます。</p>
         </div>
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h3 class="text-sm font-semibold text-blue-800 mb-1">ℹ️ データの保存について</h3>
@@ -939,41 +1033,79 @@
     </div>
 </div>
 
-<!-- 編集モーダル -->
+<!-- 施光記録編集モーダル -->
 <div id="edit-modal" class="modal hidden">
-    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">✏️ 記録を編集</h3>
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">✏️ 施光記録を編集</h3>
         <div class="space-y-3">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">名前</label>
-                <input type="text" id="edit-person" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">日付</label>
-                <input type="date" id="edit-date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">施光時間（分）</label>
-                <input type="text" id="edit-playtime" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">施光の種類</label>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">名前</label>
+                <input type="text" id="edit-person" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">日付</label>
+                <input type="date" id="edit-date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">施光時間（分）</label>
+                <input type="text" id="edit-playtime" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">施光の種類</label>
                 <div class="checkbox-group">
                     <div class="checkbox-item"><input type="checkbox" id="edit-type-8" value="⑧"><label for="edit-type-8">⑧</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="edit-type-7" value="⑦"><label for="edit-type-7">⑦</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="edit-type-6" value="⑥"><label for="edit-type-6">⑥</label></div>
                     <div class="checkbox-item"><input type="checkbox" id="edit-type-1" value="①"><label for="edit-type-1">①</label></div>
                 </div>
-                <input type="text" id="edit-custom-type" placeholder="その他" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mt-2">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">施光場所</label>
-                <input type="text" id="edit-location" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
+                <input type="text" id="edit-custom-type" placeholder="その他" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mt-2"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">施光場所</label>
+                <input type="text" id="edit-location" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"></div>
         </div>
         <div class="flex gap-3 justify-end mt-6">
             <button onclick="hideEditModal()" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">キャンセル</button>
             <button onclick="updateRecord()" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">更新</button>
+        </div>
+    </div>
+</div>
+
+<!-- 受光記録編集モーダル -->
+<div id="edit-receive-modal" class="modal hidden">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">✏️ 受光記録を編集</h3>
+        <div class="space-y-3">
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">施光してくれた人</label>
+                <input type="text" id="edit-receive-person" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:outline-none"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">日付</label>
+                <input type="date" id="edit-receive-date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:outline-none"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">受光時間（分）</label>
+                <input type="text" id="edit-receive-time" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:outline-none"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">受光内容</label>
+                <div class="checkbox-group">
+                    <div class="checkbox-item"><input type="checkbox" id="edit-receive-type-8" value="⑧"><label for="edit-receive-type-8">⑧</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="edit-receive-type-7" value="⑦"><label for="edit-receive-type-7">⑦</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="edit-receive-type-6" value="⑥"><label for="edit-receive-type-6">⑥</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="edit-receive-type-1" value="①"><label for="edit-receive-type-1">①</label></div>
+                </div>
+                <input type="text" id="edit-receive-custom-type" placeholder="その他" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm mt-2"></div>
+            <div><label class="block text-sm font-medium text-gray-700 mb-1">受光場所</label>
+                <input type="text" id="edit-receive-location" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:outline-none"></div>
+        </div>
+        <div class="flex gap-3 justify-end mt-6">
+            <button onclick="hideEditReceiveModal()" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">キャンセル</button>
+            <button onclick="updateReceiveRecord()" class="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600">更新</button>
+        </div>
+    </div>
+</div>
+
+<!-- メモモーダル -->
+<div id="memo-modal" class="modal hidden">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-semibold text-gray-800 mb-1">📝 <span id="memo-person-name"></span> のメモ</h3>
+        <input type="hidden" id="memo-person-input">
+        <div id="memo-list" class="space-y-2 mb-4 max-h-48 overflow-y-auto"></div>
+        <div class="border-t pt-4 space-y-2">
+            <p class="text-sm font-medium text-gray-700">メモを追加・編集</p>
+            <input type="date" id="memo-date-input" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-400 focus:outline-none text-sm">
+            <textarea id="memo-text-input" placeholder="メモを入力..." rows="3"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-400 focus:outline-none text-sm resize-none"></textarea>
+        </div>
+        <div class="flex gap-3 justify-end mt-4">
+            <button onclick="hideMemoModal()" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 text-sm">閉じる</button>
+            <button onclick="saveMemo()" class="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 text-sm">保存</button>
         </div>
     </div>
 </div>
@@ -990,13 +1122,10 @@
     </div>
 </div>
 
-<!-- インポートモーダル（将来用・現在は非表示） -->
 <div id="import-modal" class="modal hidden">
     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">CSVインポート</h3>
-        <textarea id="import-data" class="w-full h-40 px-3 py-2 border border-gray-300 rounded-md text-sm font-mono"></textarea>
         <div class="flex gap-3 justify-end mt-4">
-            <button onclick="hideImportModal()" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">閉じる</button>
+            <button onclick="closeAllModals()" class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">閉じる</button>
         </div>
     </div>
 </div>
