@@ -509,14 +509,15 @@
             const today = getToday();
             document.getElementById('calendar-title').textContent = year + '年' + (month + 1) + '月';
             const firstDay = new Date(year, month, 1);
-            const startDate = new Date(firstDay);
+            const startDate = new Date(year, month, 1);
             startDate.setDate(startDate.getDate() - firstDay.getDay());
             const calendarDays = document.getElementById('calendar-days');
             calendarDays.innerHTML = '';
             for (let i = 0; i < 42; i++) {
-                const cur = new Date(startDate);
-                cur.setDate(startDate.getDate() + i);
-                const dateStr = cur.toISOString().split('T')[0];
+                const cur = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i);
+                const dateStr = cur.getFullYear() + '-' +
+                    String(cur.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(cur.getDate()).padStart(2, '0');
                 const dayRecords = records.filter(r => r.date === dateStr);
                 const dayReceive = receiveRecords.filter(r => r.date === dateStr);
                 const isCurrentMonth = cur.getMonth() === month;
