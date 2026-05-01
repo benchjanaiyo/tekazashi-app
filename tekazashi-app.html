@@ -998,7 +998,7 @@
             const wrapper = document.querySelector('.tab-content-wrapper');
             let startX = 0, startY = 0, currentX = 0;
             let isSwiping = false, isHorizontal = null;
-            const THRESHOLD = 80; // px
+            const THRESHOLD = 120; // px - 切り替えに必要な距離
 
             wrapper.addEventListener('touchstart', e => {
                 startX = e.touches[0].clientX;
@@ -1024,10 +1024,10 @@
                 if (!isHorizontal) return;
 
                 currentX = dx;
-                // 端のタブでは抵抗感を出す
+                // 端のタブでは強い抵抗感を出す
                 const atLeft = currentTabIndex === 0 && dx > 0;
                 const atRight = currentTabIndex === TAB_ORDER.length - 1 && dx < 0;
-                const resistance = (atLeft || atRight) ? 0.25 : 1;
+                const resistance = (atLeft || atRight) ? 0.12 : 0.85;
                 const offset = currentTabIndex * 20 - (dx * resistance / wrapper.offsetWidth) * 100;
                 getSlider().style.transform = `translateX(-${offset}%)`;
             }, { passive: true });
@@ -1272,7 +1272,7 @@
         .tab-content-slider {
             display: flex;
             width: 500%; /* タブ数 × 100% */
-            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: transform 0.4s cubic-bezier(0.35, 0.0, 0.25, 1.0);
             will-change: transform;
         }
         .tab-content-slider.no-transition {
