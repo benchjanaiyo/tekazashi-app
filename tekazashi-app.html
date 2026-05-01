@@ -364,10 +364,6 @@
         window.showMemoModal = function(personName) {
             document.getElementById('memo-person-name').textContent = personName;
             document.getElementById('memo-person-input').value = personName;
-            document.getElementById('memo-date-input').value = getToday();
-            document.getElementById('memo-text-input').value = '';
-            editingMemo = null;
-            renderPersonMemos(personName);
             renderPersonHistory(personName);
             openModal('memo-modal');
         };
