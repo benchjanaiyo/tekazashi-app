@@ -49,6 +49,14 @@
             calMode = mode;
             document.getElementById('cal-tab-give').classList.toggle('active', mode === 'give');
             document.getElementById('cal-tab-receive').classList.toggle('active', mode === 'receive');
+            // 受光タブでは未組手フィルターを非表示
+            const mikuniteBtn = document.getElementById('cal-filter-mikunite');
+            mikuniteBtn.style.display = mode === 'receive' ? 'none' : '';
+            // 受光でONになっていた未組手フィルターはリセット
+            if (mode === 'receive' && calFilter.mikunite) {
+                calFilter.mikunite = false;
+                mikuniteBtn.classList.remove('cal-filter-active');
+            }
             updateCalendar();
         };
 
@@ -994,11 +1002,12 @@
             });
             document.getElementById('tab-' + viewName).classList.add('active');
             currentTabIndex = TAB_ORDER.indexOf(viewName);
-            moveSlider(currentTabIndex, animate !== false);
+            // タブクリック時はanimate=false（即時）、スワイプ時はtrue（アニメーション）
+            moveSlider(currentTabIndex, animate === true);
             const activeTab = document.getElementById('tab-' + viewName);
             activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-            if (viewName === 'calendar') setTimeout(updateCalendar, 300);
-            else if (viewName === 'stats') setTimeout(updateStats, 300);
+            if (viewName === 'calendar') setTimeout(updateCalendar, 50);
+            else if (viewName === 'stats') setTimeout(updateStats, 50);
         };
 
         // スワイプ対応（指についてくるアニメーション）
@@ -1047,9 +1056,9 @@
 
                 if (isHorizontal && Math.abs(currentX) > THRESHOLD) {
                     if (currentX < 0 && currentTabIndex < TAB_ORDER.length - 1) {
-                        showView(TAB_ORDER[currentTabIndex + 1]);
+                        showView(TAB_ORDER[currentTabIndex + 1], true);
                     } else if (currentX > 0 && currentTabIndex > 0) {
-                        showView(TAB_ORDER[currentTabIndex - 1]);
+                        showView(TAB_ORDER[currentTabIndex - 1], true);
                     } else {
                         moveSlider(currentTabIndex, true);
                     }
@@ -1453,7 +1462,7 @@
         .cal-num { font-size: 13px; font-weight: 500; color: var(--gray-700); margin-bottom: 2px; }
         .cal-day.other-month .cal-num { color: var(--gray-300); }
         .cal-dots { display: flex; flex-direction: column; gap: 2px; }
-        .cal-label { font-size: 10px; padding: 1px 4px; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cal-label { font-size: 10px; padding: 1px 4px; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
         .give-label { background: var(--blue-100); color: var(--blue-800); }
         .receive-label { background: var(--green-50); color: var(--green-700); border: 1px solid #bbf7d0; }
         .cal-more { font-size: 10px; color: var(--gray-400); }
@@ -1782,7 +1791,7 @@
         <div class="cal-filters">
             <span style="font-size:12px;color:var(--gray-500);align-self:center;">絞り込み：</span>
             <button id="cal-filter-mikunite" class="cal-filter-btn" onclick="toggleCalFilter('mikunite')">未組手</button>
-            <button id="cal-filter-time10" class="cal-filter-btn" onclick="toggleCalFilter('time10')">10分以上</button>
+            <button id="cal-filter-time10" class="cal-filter-btn" onclick="toggleCalFilter('time10')">10分オーバ</button>
             <button id="cal-filter-type8" class="cal-filter-btn" onclick="toggleCalFilter('type8')">⑧</button>
             <button id="cal-filter-type7" class="cal-filter-btn" onclick="toggleCalFilter('type7')">⑦</button>
             <button id="cal-filter-type6" class="cal-filter-btn" onclick="toggleCalFilter('type6')">⑥</button>
