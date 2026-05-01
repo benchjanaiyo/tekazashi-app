@@ -137,7 +137,7 @@
                 duplicateInfo = { person: personName, date: selectedDate, playTime, types, location };
                 document.getElementById('duplicate-message').textContent =
                     selectedDate + 'に' + personName + 'さんの記録が既に存在します。それでも追加しますか？';
-                document.getElementById('duplicate-modal').classList.remove('hidden');
+                openModal('duplicate-modal');
                 return;
             }
             await addRecord(personName, playTime, selectedDate, types, location);
@@ -196,7 +196,7 @@
                     else if (t) document.getElementById('edit-type-custom').value = t;
                 });
             }
-            document.getElementById('edit-modal').classList.remove('hidden');
+            openModal('edit-modal');
         };
 
         window.updateRecord = async function() {
@@ -270,7 +270,7 @@
                     else if (t) document.getElementById('edit-receive-type-custom').value = t;
                 });
             }
-            document.getElementById('edit-receive-modal').classList.remove('hidden');
+            openModal('edit-receive-modal');
         };
 
         window.updateReceiveRecord = async function() {
@@ -296,6 +296,7 @@
         window.hideEditReceiveModal = function() {
             document.getElementById('edit-receive-modal').classList.add('hidden');
             editingReceiveRecord = null;
+            document.body.style.overflow = '';
         };
 
         // 受光の人名サジェスト（施光記録の人名 + 受光記録の人名から）
@@ -365,7 +366,7 @@
             editingMemo = null;
             renderPersonMemos(personName);
             renderPersonHistory(personName);
-            document.getElementById('memo-modal').classList.remove('hidden');
+            openModal('memo-modal');
         };
 
         function renderPersonHistory(personName) {
@@ -466,6 +467,7 @@
         window.hideMemoModal = function() {
             document.getElementById('memo-modal').classList.add('hidden');
             editingMemo = null;
+            document.body.style.overflow = '';
         };
 
         // ===================== 施光履歴モーダル =====================
@@ -492,7 +494,7 @@
                     list.appendChild(div);
                 });
             }
-            document.getElementById('history-modal').classList.remove('hidden');
+            openModal('history-modal');
         };
 
         window.hideHistoryModal = function() {
@@ -570,7 +572,11 @@
                         for (const row of rows) {
                             const [date, person, playTime, types, location] = row;
                             if (!date || !person) continue;
-                            const exists = records.some(r => r.date === date && r.person === person);
+                            // 日付・名前・種類・場所すべて一致する場合のみスキップ
+                            const exists = records.some(r =>
+                                r.date === date && r.person === person &&
+                                (r.types||'') === (types||'') && (r.location||'') === (location||'')
+                            );
                             if (exists) { skipped++; continue; }
                             const newRecord = { uid: currentUser.uid, person, date,
                                 playTime: playTime || null, types: types || '', location: location || '',
@@ -584,7 +590,10 @@
                         for (const row of rows) {
                             const [date, person, receiveTime, types, location] = row;
                             if (!date || !person) continue;
-                            const exists = receiveRecords.some(r => r.date === date && r.person === person);
+                            const exists = receiveRecords.some(r =>
+                                r.date === date && r.person === person &&
+                                (r.types||'') === (types||'') && (r.location||'') === (location||'')
+                            );
                             if (exists) { skipped++; continue; }
                             const newRecord = { uid: currentUser.uid, person, date,
                                 receiveTime: receiveTime || null, types: types || '', location: location || '',
@@ -793,7 +802,7 @@
                 const btn = document.createElement('button');
                 btn.className = 'person-chip';
                 btn.innerHTML = escapeHtml(name) +
-                    (count > 0 ? `<span class="chip-count">${count}</span>` : '');
+                    (count > 0 ? `<span class="chip-count" title="過去30日の施光回数">${count}回</span>` : '');
                 btn.onclick = () => { document.getElementById('person-name').value = name; };
 
                 const memoBtn = document.createElement('button');
@@ -956,13 +965,27 @@
         window.currentMonth = () => { currentCalendarDate = new Date(); updateCalendar(); };
 
         // ===================== モーダル =====================
-        window.hideEditModal = () => { document.getElementById('edit-modal').classList.add('hidden'); editingRecord = null; };
-        window.hideDuplicateModal = () => { document.getElementById('duplicate-modal').classList.add('hidden'); duplicateInfo = null; };
+        window.hideEditModal = () => {
+            document.getElementById('edit-modal').classList.add('hidden');
+            editingRecord = null;
+            document.body.style.overflow = '';
+        };
+        window.hideDuplicateModal = () => {
+            document.getElementById('duplicate-modal').classList.add('hidden');
+            duplicateInfo = null;
+            document.body.style.overflow = '';
+        };
         window.closeAllModals = () => {
             ['edit-modal','duplicate-modal','memo-modal','edit-receive-modal','history-modal'].forEach(id =>
                 document.getElementById(id).classList.add('hidden'));
             editingRecord = null; duplicateInfo = null; editingMemo = null; editingReceiveRecord = null;
+            document.body.style.overflow = '';
         };
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
 
         // ===================== タブ切り替え（スライダー） =====================
         const TAB_ORDER = ['give', 'receive', 'calendar', 'stats', 'data'];
@@ -998,7 +1021,7 @@
             const wrapper = document.querySelector('.tab-content-wrapper');
             let startX = 0, startY = 0, currentX = 0;
             let isSwiping = false, isHorizontal = null;
-            const THRESHOLD = 120; // px - 切り替えに必要な距離
+            const THRESHOLD = 80; // px - 切り替えに必要な距離
 
             wrapper.addEventListener('touchstart', e => {
                 startX = e.touches[0].clientX;
@@ -1027,7 +1050,7 @@
                 // 端のタブでは強い抵抗感を出す
                 const atLeft = currentTabIndex === 0 && dx > 0;
                 const atRight = currentTabIndex === TAB_ORDER.length - 1 && dx < 0;
-                const resistance = (atLeft || atRight) ? 0.12 : 0.85;
+                const resistance = (atLeft || atRight) ? 0.2 : 1.0;
                 const offset = currentTabIndex * 20 - (dx * resistance / wrapper.offsetWidth) * 100;
                 getSlider().style.transform = `translateX(-${offset}%)`;
             }, { passive: true });
@@ -1484,10 +1507,10 @@
         .history-chip:hover { background: var(--blue-50); border-color: var(--blue-300); }
 
         /* ===== 履歴モーダル ===== */
-        .history-item { padding: 12px 0; border-bottom: 1px solid var(--gray-100); }
+        .history-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--gray-100); flex-wrap: wrap; }
         .history-item:last-child { border-bottom: none; }
-        .history-date { font-size: 14px; font-weight: 600; color: var(--gray-700); margin-bottom: 5px; }
-        .history-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+        .history-date { font-size: 13px; font-weight: 600; color: var(--gray-600); white-space: nowrap; min-width: 90px; }
+        .history-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 
         /* ===== 統計 ===== */
         .stats-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
@@ -1905,7 +1928,7 @@
         <!-- 施光履歴セクション -->
         <div style="margin-bottom:16px;">
             <div style="font-size:14px;font-weight:600;color:var(--gray-700);margin-bottom:8px;">📋 施光履歴</div>
-            <div id="person-history-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--gray-200);border-radius:var(--radius);padding:4px 0;"></div>
+            <div id="person-history-list" style="border:1px solid var(--gray-200);border-radius:var(--radius);padding:4px 0;"></div>
         </div>
 
         <!-- メモセクション -->
