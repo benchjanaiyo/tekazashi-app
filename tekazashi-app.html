@@ -70,7 +70,7 @@
         function recordMatchesFilter(record) {
             if (!Object.values(calFilter).some(v => v)) return true; // 全OFFなら全表示
             if (calFilter.mikunite && record.types && record.types.includes('未組手')) return true;
-            if (calFilter.time10 && record.playTime && parseInt(record.playTime) >= 10) return true;
+            if (calFilter.time10 && record.playTime && parseInt(record.playTime) >= 11) return true;
             if (calFilter.type8 && record.types && record.types.includes('⑧')) return true;
             if (calFilter.type7 && record.types && record.types.includes('⑦')) return true;
             if (calFilter.type6 && record.types && record.types.includes('⑥')) return true;
