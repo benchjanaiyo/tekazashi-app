@@ -743,11 +743,11 @@
                             </div>
                         </div>
                         <div class="record-actions">
-                            <button onclick='editRecord(${JSON.stringify(record).replace(/'/g,"\\'")})'
-                                class="icon-btn">✏️</button>
-                            <button onclick="deleteRecord('${record.id}')"
-                                class="icon-btn danger">🗑️</button>
+                            <button class="icon-btn edit-give-btn">✏️</button>
+                            <button onclick="deleteRecord('${record.id}')" class="icon-btn danger">🗑️</button>
                         </div>`;
+                    // editボタンにrecordオブジェクトを直接紐付け
+                    div.querySelector('.edit-give-btn').addEventListener('click', () => editRecord(record));
                     list.appendChild(div);
                 });
             } else {
@@ -778,11 +778,11 @@
                             </div>
                         </div>
                         <div class="record-actions">
-                            <button onclick='editReceiveRecord(${JSON.stringify(record).replace(/'/g,"\\'")})'
-                                class="icon-btn">✏️</button>
+                            <button class="icon-btn edit-receive-btn">✏️</button>
                             <button onclick="deleteReceiveRecord('${record.id}')"
                                 class="icon-btn danger">🗑️</button>
                         </div>`;
+                    div.querySelector('.edit-receive-btn').addEventListener('click', () => editReceiveRecord(record));
                     list.appendChild(div);
                 });
             } else {
