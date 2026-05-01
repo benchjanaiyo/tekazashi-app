@@ -677,6 +677,8 @@
             document.getElementById('type-custom').value = '';
             document.getElementById('location').value = '';
             document.getElementById('give-memo').value = '';
+            const btn = document.getElementById('history-check-btn');
+            if (btn) btn.disabled = true;
         }
         function clearReceiveInputs() {
             document.getElementById('receive-person').value = '';
@@ -1145,21 +1147,28 @@
                     const div = document.createElement('div');
                     div.className = 'suggest-item';
                     div.textContent = name;
-                    div.onclick = () => { giveNameInput.value = name; giveNameSuggest.classList.add('hidden'); };
+                    div.onclick = () => {
+                        giveNameInput.value = name;
+                        giveNameSuggest.classList.add('hidden');
+                        updateHistoryBtn();
+                    };
                     giveNameSuggest.appendChild(div);
                 });
                 giveNameSuggest.classList.remove('hidden');
             }
+            function updateHistoryBtn() {
+                const btn = document.getElementById('history-check-btn');
+                if (btn) btn.disabled = !giveNameInput.value.trim();
+            }
             // 施光名前入力→履歴確認ボタンの有効/無効を連動
             giveNameInput.addEventListener('input', () => {
                 showGiveNameSuggest();
-                const btn = document.getElementById('history-check-btn');
-                if (btn) btn.disabled = !giveNameInput.value.trim();
+                updateHistoryBtn();
             });
             giveNameInput.addEventListener('focus', showGiveNameSuggest);
-            giveNameInput.addEventListener('change', () => {
-                const btn = document.getElementById('history-check-btn');
-                if (btn) btn.disabled = !giveNameInput.value.trim();
+            giveNameInput.addEventListener('change', updateHistoryBtn);
+            giveNameInput.addEventListener('keypress', e => {
+                if (e.key === 'Enter') updateHistoryBtn();
             });
             document.addEventListener('click', e => {
                 if (!giveNameInput.contains(e.target) && !giveNameSuggest.contains(e.target))
