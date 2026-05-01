@@ -302,42 +302,24 @@
             document.body.style.overflow = '';
         };
 
-        // 受光の人名サジェスト（施光記録の人名 + 受光記録の人名から）
+        // 受光の人名サジェスト（受光記録の人名のみから）
         function setupReceivePersonSuggest() {
             const input = document.getElementById('receive-person');
             const suggest = document.getElementById('receive-person-suggest');
-            const quickBtns = document.getElementById('receive-person-quick');
 
             function getPersonList() {
-                const givePeople = [...new Set(records.map(r => r.person))];
-                const receivePeople = [...new Set(receiveRecords.map(r => r.person))];
-                const all = [...new Set([...givePeople, ...receivePeople])];
-                // 施光回数多い順にソート
-                return all.sort((a, b) => {
-                    const ca = records.filter(r => r.person === a).length;
-                    const cb = records.filter(r => r.person === b).length;
+                const people = [...new Set(receiveRecords.map(r => r.person))];
+                return people.sort((a, b) => {
+                    const ca = receiveRecords.filter(r => r.person === a).length;
+                    const cb = receiveRecords.filter(r => r.person === b).length;
                     return cb - ca;
-                });
-            }
-
-            function renderQuickButtons() {
-                quickBtns.innerHTML = '';
-                getPersonList().slice(0, 8).forEach(name => {
-                    const btn = document.createElement('button');
-                    btn.className = 'quick-btn';
-                    btn.textContent = name;
-                    btn.onclick = () => {
-                        input.value = name;
-                        suggest.classList.add('hidden');
-                    };
-                    quickBtns.appendChild(btn);
                 });
             }
 
             function renderSuggest() {
                 const val = input.value.trim();
-                if (!val) { suggest.classList.add('hidden'); renderQuickButtons(); return; }
-                const filtered = getPersonList().filter(n => n.includes(val));
+                const all = getPersonList();
+                const filtered = val ? all.filter(n => n.includes(val)) : all;
                 if (filtered.length === 0) { suggest.classList.add('hidden'); return; }
                 suggest.innerHTML = '';
                 filtered.forEach(name => {
@@ -350,14 +332,14 @@
                 suggest.classList.remove('hidden');
             }
 
-            input.addEventListener('focus', () => { renderQuickButtons(); renderSuggest(); });
+            input.addEventListener('focus', renderSuggest);
             input.addEventListener('input', renderSuggest);
             document.addEventListener('click', e => {
-                if (!input.contains(e.target) && !suggest.contains(e.target) && !quickBtns.contains(e.target))
+                if (!input.contains(e.target) && !suggest.contains(e.target))
                     suggest.classList.add('hidden');
             });
 
-            window._refreshReceivePersonSuggest = renderQuickButtons;
+            window._refreshReceivePersonSuggest = () => {}; // 互換性のため空関数
         }
 
         // ===================== 人別メモ =====================
@@ -1053,7 +1035,7 @@
                 // 端のタブでは強い抵抗感を出す
                 const atLeft = currentTabIndex === 0 && dx > 0;
                 const atRight = currentTabIndex === TAB_ORDER.length - 1 && dx < 0;
-                const resistance = (atLeft || atRight) ? 0.2 : 1.0;
+                const resistance = (atLeft || atRight) ? 0.08 : 0.4;
                 const offset = currentTabIndex * 20 - (dx * resistance / wrapper.offsetWidth) * 100;
                 getSlider().style.transform = `translateX(-${offset}%)`;
             }, { passive: true });
@@ -1247,7 +1229,6 @@
         #app-screen {
             max-width: 680px; margin: 0 auto;
             background: #fff;
-            min-height: 100vh;
         }
 
         /* ===== ヘッダー ===== */
@@ -1298,7 +1279,7 @@
         .tab-content-slider {
             display: flex;
             width: 500%; /* タブ数 × 100% */
-            transition: transform 0.4s cubic-bezier(0.35, 0.0, 0.25, 1.0);
+            transition: transform 1.0s cubic-bezier(0.35, 0.0, 0.25, 1.0);
             will-change: transform;
         }
         .tab-content-slider.no-transition {
@@ -1687,7 +1668,7 @@
         </div>
 
         <div class="form-group">
-            <label class="form-label">種類</label>
+            <label class="form-label">施光</label>
             <div class="type-group">
                 <div class="type-item"><input type="checkbox" id="type-8" value="⑧"><label for="type-8">⑧</label></div>
                 <div class="type-item"><input type="checkbox" id="type-7" value="⑦"><label for="type-7">⑦</label></div>
@@ -1737,20 +1718,17 @@
 
         <div class="form-group">
             <label class="form-label">👤 施光してくれた人</label>
-            <div id="receive-person-quick" class="quick-btns"></div>
-            <div class="suggest-wrapper">
-                <input type="text" id="receive-person" placeholder="名前を入力または上から選択" class="form-input" autocomplete="off">
-                <div id="receive-person-suggest" class="suggest-dropdown hidden"></div>
+            <div class="input-row">
+                <div class="suggest-wrapper" style="flex:1;">
+                    <input type="text" id="receive-person" placeholder="名前を入力" class="form-input" autocomplete="off">
+                    <div id="receive-person-suggest" class="suggest-dropdown hidden"></div>
+                </div>
+                <input type="text" id="receive-time" value="10" placeholder="分" class="form-input input-time">
             </div>
         </div>
 
         <div class="form-group">
-            <label class="form-label">⏱ 受光時間（分）</label>
-            <input type="text" id="receive-time" value="10" class="form-input" style="max-width:120px;">
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">受光の種類</label>
+            <label class="form-label">種類</label>
             <div class="type-group">
                 <div class="type-item"><input type="checkbox" id="receive-type-8" value="⑧"><label for="receive-type-8">⑧</label></div>
                 <div class="type-item"><input type="checkbox" id="receive-type-7" value="⑦"><label for="receive-type-7">⑦</label></div>
@@ -1761,7 +1739,7 @@
         </div>
 
         <div class="form-group">
-            <label class="form-label">📍 受光場所</label>
+            <label class="form-label">📍 場所</label>
             <div class="suggest-wrapper">
                 <input type="text" id="receive-location" placeholder="例：自宅、道場、外出先" class="form-input" autocomplete="off">
                 <div id="receive-location-suggest" class="suggest-dropdown hidden"></div>
