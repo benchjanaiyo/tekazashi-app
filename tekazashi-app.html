@@ -154,7 +154,7 @@
             document.getElementById('edit-date').value = record.date;
             document.getElementById('edit-playtime').value = record.playTime || '';
             document.getElementById('edit-location').value = record.location || '';
-            document.getElementById('edit-custom-type').value = '';
+            document.getElementById('edit-type-custom').value = '';
             ['edit-type-8','edit-type-7','edit-type-6','edit-type-1','edit-type-mikunite'].forEach(id =>
                 document.getElementById(id).checked = false);
             if (record.types) {
@@ -164,7 +164,7 @@
                     else if (t === '⑥') document.getElementById('edit-type-6').checked = true;
                     else if (t === '①') document.getElementById('edit-type-1').checked = true;
                     else if (t === '未組手') document.getElementById('edit-type-mikunite').checked = true;
-                    else if (t) document.getElementById('edit-custom-type').value = t;
+                    else if (t) document.getElementById('edit-type-custom').value = t;
                 });
             }
             document.getElementById('edit-modal').classList.remove('hidden');
@@ -229,7 +229,7 @@
             document.getElementById('edit-receive-date').value = record.date;
             document.getElementById('edit-receive-time').value = record.receiveTime || '';
             document.getElementById('edit-receive-location').value = record.location || '';
-            document.getElementById('edit-receive-custom-type').value = '';
+            document.getElementById('edit-receive-type-custom').value = '';
             ['edit-receive-type-8','edit-receive-type-7','edit-receive-type-6','edit-receive-type-1'].forEach(id =>
                 document.getElementById(id).checked = false);
             if (record.types) {
@@ -238,7 +238,7 @@
                     else if (t === '⑦') document.getElementById('edit-receive-type-7').checked = true;
                     else if (t === '⑥') document.getElementById('edit-receive-type-6').checked = true;
                     else if (t === '①') document.getElementById('edit-receive-type-1').checked = true;
-                    else if (t) document.getElementById('edit-receive-custom-type').value = t;
+                    else if (t) document.getElementById('edit-receive-type-custom').value = t;
                 });
             }
             document.getElementById('edit-receive-modal').classList.remove('hidden');
