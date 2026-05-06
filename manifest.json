@@ -1,0 +1,17 @@
+{
+  "name": "手かざし記録",
+  "short_name": "手かざし",
+  "description": "手かざし施光・受光の記録アプリ",
+  "start_url": "./tekazashi-app.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a56db",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "https://em-content.zobj.net/source/apple/391/palms-up-together_1f932.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    }
+  ]
+}
