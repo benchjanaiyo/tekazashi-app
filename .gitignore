@@ -5,5 +5,5 @@ manuals/
 tekazashi-app-ForMentenance.html
 
 # 念のため個別指定
-*.pdf
+manuals/*.pdf
 *.pptx
