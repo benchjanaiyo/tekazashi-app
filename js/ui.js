@@ -6,8 +6,9 @@
  * 各タブ固有の処理（updateCalendar等）は window.xxx 経由で呼ぶ。
  * ============================================================ */
 
-import { state, typeTimeMap, receiveTypeTimeMap } from './config.js';
+import { db, state, typeTimeMap, receiveTypeTimeMap } from './config.js';
 import { getLocationHistory } from './utils.js';
+import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 /* ===================== タブ切り替え ===================== */
 
@@ -111,7 +112,42 @@ window.closeAllModals = function () {
     document.body.style.overflow = '';
 };
 
-window.openSettingsModal = function () { window.openModal('settings-modal'); };
+window.openSettingsModal = function () {
+    /* 現在のサブタイトルを入力欄に反映 */
+    const current = document.getElementById('header-sub').textContent;
+    document.getElementById('subtitle-input').value = current;
+    window.openModal('settings-modal');
+};
+
+/* ===================== サブタイトル ===================== */
+
+const DEFAULT_SUBTITLE = '目指せ霊文明人、地上天国';
+
+window.loadUserSubtitle = async function () {
+    if (!state.currentUser) return;
+    try {
+        const snap = await getDoc(doc(db, 'userSettings', state.currentUser.uid));
+        const subtitle = (snap.exists() && snap.data().subtitle) ? snap.data().subtitle : DEFAULT_SUBTITLE;
+        document.getElementById('header-sub').textContent = subtitle;
+    } catch (e) { /* 取得失敗時はデフォルトのまま */ }
+};
+
+window.saveUserSubtitle = async function () {
+    if (!state.currentUser) return;
+    const input    = document.getElementById('subtitle-input');
+    const subtitle = input.value.trim() || DEFAULT_SUBTITLE;
+    const btn      = document.getElementById('subtitle-save-btn');
+    btn.disabled   = true;
+    try {
+        await setDoc(doc(db, 'userSettings', state.currentUser.uid), { subtitle }, { merge: true });
+        document.getElementById('header-sub').textContent = subtitle;
+        btn.textContent = '保存済 ✓';
+        setTimeout(() => { btn.textContent = '保存'; btn.disabled = false; }, 2000);
+    } catch (e) {
+        alert('保存に失敗しました: ' + e.message);
+        btn.disabled = false;
+    }
+};
 
 /* ===================== UID コピー ===================== */
 

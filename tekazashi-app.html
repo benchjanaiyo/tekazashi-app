@@ -47,7 +47,7 @@
         <div class="header-top">
             <div>
                 <div class="header-title">🤲 手かざし記録</div>
-                <div class="header-sub">目指せ霊文明人、地上天国</div>
+                <div class="header-sub" id="header-sub">目指せ霊文明人、地上天国</div>
             </div>
             <div class="header-right">
                 <img id="user-avatar" class="user-avatar hidden" src="" alt="">
@@ -388,6 +388,17 @@
             <div class="export-btns">
                 <button onclick="importCSV('give')"    class="export-btn blue">施光記録を取り込む</button>
                 <button onclick="importCSV('receive')" class="export-btn green">受光記録を取り込む</button>
+            </div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-section-title">✏️ サブタイトル</div>
+            <p class="settings-desc">ヘッダーの一言を自分用にカスタマイズできます。</p>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+                <input type="text" id="subtitle-input" class="form-input"
+                       placeholder="目指せ霊文明人、地上天国"
+                       style="flex:1;font-size:14px;">
+                <button id="subtitle-save-btn" onclick="saveUserSubtitle()"
+                        style="padding:8px 16px;font-size:14px;background:var(--blue-600);color:white;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;">保存</button>
             </div>
         </div>
         <div class="settings-section">

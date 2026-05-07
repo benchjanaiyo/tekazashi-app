@@ -46,6 +46,7 @@ onAuthStateChanged(auth, async user => {
         await loadAllData();
         setTodayDate();       /* 先に日付をセットしてから */
         window.updateDisplay(); /* 表示を更新する（順番重要） */
+        window.loadUserSubtitle && window.loadUserSubtitle(); /* サブタイトルを読み込む */
         window.showView('give', false);
         updateUsageLog();
     } else {
