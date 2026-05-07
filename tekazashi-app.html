@@ -144,6 +144,17 @@
 
     <!-- 受光タブ -->
     <div id="view-receive" class="tab-content">
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="s-label">今月の受光</div>
+                <div class="s-value"><span id="receive-month-records">0</span><span class="s-unit">回</span></div>
+            </div>
+            <div class="summary-card">
+                <div class="s-label">累計</div>
+                <div class="s-value"><span id="receive-total-records">0</span><span class="s-unit">回</span></div>
+            </div>
+        </div>
+
         <div class="form-group">
             <label class="form-label">📅 日付</label>
             <input type="date" id="receive-selected-date" class="form-input">

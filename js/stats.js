@@ -26,6 +26,14 @@ window.updateStats = function () {
     if (elMonth) elMonth.textContent = monthCount;
     if (elTime)  elTime.textContent  = totalTime;
 
+    /* 受光タブのサマリーカード */
+    const receiveTotal      = state.receiveRecords.length;
+    const receiveMonthCount = state.receiveRecords.filter(r => r.date.startsWith(thisMonth)).length;
+    const elReceiveTotal = document.getElementById('receive-total-records');
+    const elReceiveMonth = document.getElementById('receive-month-records');
+    if (elReceiveTotal) elReceiveTotal.textContent = receiveTotal;
+    if (elReceiveMonth) elReceiveMonth.textContent = receiveMonthCount;
+
     /* 統計タブのヘッダーカード */
     const statsTotal = document.getElementById('stats-total-records');
     const statsTime  = document.getElementById('stats-total-time');
