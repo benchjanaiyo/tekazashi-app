@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>使い方ガイド — 手かざし記録アプリ</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif;
+               background: #f5f5f5; color: #333; }
+
+        .header {
+            background: #2563eb;
+            color: white;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .back-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            font-size: 15px;
+            padding: 7px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .back-btn:active { background: rgba(255,255,255,0.35); }
+        .header-title { font-size: 16px; font-weight: bold; }
+
+        .content {
+            padding: 24px 16px;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+        .desc {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.7;
+            margin-bottom: 24px;
+        }
+        .pdf-btn {
+            display: block;
+            width: 100%;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 18px;
+            font-size: 17px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .pdf-btn:active { background: #1d4ed8; }
+
+        .note {
+            margin-top: 20px;
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-size: 13px;
+            color: #78350f;
+            line-height: 1.7;
+        }
+        .note strong { display: block; margin-bottom: 4px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <button class="back-btn" onclick="history.back()">← 戻る</button>
+        <span class="header-title">使い方ガイド</span>
+    </div>
+
+    <div class="content">
+        <p class="desc">
+            手かざし記録アプリの使い方ガイドです。<br>
+            下のボタンからPDFをご覧いただけます。
+        </p>
+
+        <a class="pdf-btn" href="tekazashi_guide.pdf" target="_blank">
+            📄　使い方ガイドを開く（PDF）
+        </a>
+
+        <div class="note">
+            <strong>📱 iPhoneでホーム画面から起動している場合</strong>
+            PDFはSafariで開きます。
+            アプリに戻るには、画面下の「＜＜」またはアプリ切り替えでこの画面に戻り、
+            「← 戻る」をタップしてください。
+        </div>
+    </div>
+
+</body>
+</html>
