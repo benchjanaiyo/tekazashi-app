@@ -116,21 +116,42 @@ window.openSettingsModal = function () {
     /* 現在のサブタイトルを入力欄に反映 */
     const current = document.getElementById('header-sub').textContent;
     document.getElementById('subtitle-input').value = current;
+    /* 現在の集計開始月を入力欄に反映 */
+    document.getElementById('stats-start-month-input').value = state.statsStartMonth || '';
     window.openModal('settings-modal');
 };
 
-/* ===================== サブタイトル ===================== */
+/* ===================== ユーザー設定（サブタイトル・集計開始月） ===================== */
 
 const DEFAULT_SUBTITLE = '目指せ霊文明人、地上天国';
 
+/* ログイン後にFirestoreからユーザー設定を一括読み込み */
 window.loadUserSubtitle = async function () {
     if (!state.currentUser) return;
     try {
         const snap = await getDoc(doc(db, 'userSettings', state.currentUser.uid));
-        const subtitle = (snap.exists() && snap.data().subtitle) ? snap.data().subtitle : DEFAULT_SUBTITLE;
+        const data = snap.exists() ? snap.data() : {};
+
+        /* サブタイトル */
+        const subtitle = data.subtitle || DEFAULT_SUBTITLE;
         document.getElementById('header-sub').textContent = subtitle;
+
+        /* 集計開始月 */
+        state.statsStartMonth = data.statsStartMonth || null;
+        applyStatsStartMonth();
     } catch (e) { /* 取得失敗時はデフォルトのまま */ }
 };
+
+/* 集計開始月をUIに反映する（ラベル・統計タブの期間テキスト） */
+function applyStatsStartMonth() {
+    const m = state.statsStartMonth;
+    /* 施光タブの累計ラベル */
+    const giveLabel = document.getElementById('give-total-label');
+    if (giveLabel) giveLabel.textContent = m ? `累計（${m.replace('-', '/')}〜）` : '累計';
+    /* 統計タブの集計期間テキスト */
+    const periodLabel = document.getElementById('stats-period-label');
+    if (periodLabel) periodLabel.textContent = m ? `集計期間：${m.replace('-', '/')}〜` : '';
+}
 
 window.saveUserSubtitle = async function () {
     if (!state.currentUser) return;
@@ -147,6 +168,30 @@ window.saveUserSubtitle = async function () {
         alert('保存に失敗しました: ' + e.message);
         btn.disabled = false;
     }
+};
+
+window.saveStatsStartMonth = async function () {
+    if (!state.currentUser) return;
+    const val = document.getElementById('stats-start-month-input').value; /* "YYYY-MM" or "" */
+    const btn = document.getElementById('stats-start-month-save-btn');
+    btn.disabled = true;
+    try {
+        await setDoc(doc(db, 'userSettings', state.currentUser.uid),
+            { statsStartMonth: val || null }, { merge: true });
+        state.statsStartMonth = val || null;
+        applyStatsStartMonth();
+        window.updateStats && window.updateStats();
+        btn.textContent = '保存済 ✓';
+        setTimeout(() => { btn.textContent = '保存'; btn.disabled = false; }, 2000);
+    } catch (e) {
+        alert('保存に失敗しました: ' + e.message);
+        btn.disabled = false;
+    }
+};
+
+window.clearStatsStartMonth = async function () {
+    document.getElementById('stats-start-month-input').value = '';
+    window.saveStatsStartMonth();
 };
 
 /* ===================== UID コピー ===================== */

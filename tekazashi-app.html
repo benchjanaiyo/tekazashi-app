@@ -78,7 +78,7 @@
                 <div class="s-value"><span id="month-records">0</span><span class="s-unit">回</span></div>
             </div>
             <div class="summary-card">
-                <div class="s-label">累計</div>
+                <div class="s-label" id="give-total-label">累計</div>
                 <div class="s-value"><span id="total-records">0</span><span class="s-unit">回</span></div>
             </div>
         </div>
@@ -263,6 +263,7 @@
             <button id="stat-tab-yearly"  class="cal-subtab"        onclick="switchStatTab('yearly')">年</button>
             <button id="stat-tab-admin"   class="cal-subtab hidden" onclick="switchStatTab('admin')">👑利用状況</button>
         </div>
+        <div id="stats-period-label" style="font-size:12px;color:var(--gray-400);text-align:right;margin-bottom:8px;"></div>
 
         <!-- 人別 -->
         <div id="stat-view-people">
@@ -428,6 +429,18 @@
                 <button onclick="importCSV('give')"    class="export-btn blue">施光記録を取り込む</button>
                 <button onclick="importCSV('receive')" class="export-btn green">受光記録を取り込む</button>
             </div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-section-title">📅 集計開始月</div>
+            <p class="settings-desc">統計・累計の集計を開始する月を設定します。未設定の場合は全期間が対象です。</p>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+                <input type="month" id="stats-start-month-input" class="form-input"
+                       style="flex:1;font-size:16px;">
+                <button id="stats-start-month-save-btn" onclick="saveStatsStartMonth()"
+                        style="padding:8px 16px;font-size:14px;background:var(--blue-600);color:white;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;">保存</button>
+            </div>
+            <button onclick="clearStatsStartMonth()"
+                    style="margin-top:8px;font-size:13px;color:var(--gray-500);background:none;border:none;cursor:pointer;padding:0;">全期間に戻す</button>
         </div>
         <div class="settings-section">
             <div class="settings-section-title">✏️ サブタイトル</div>

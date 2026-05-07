@@ -27,11 +27,17 @@ window.switchStatTab = function (tab) {
 
 window.updateStats = function () {
     const thisMonth      = getToday().substring(0, 7);
-    const total          = state.records.length;
-    const monthCount     = state.records.filter(r => r.date.startsWith(thisMonth)).length;
-    const totalTime      = state.records.reduce((s, r) => s + (parseInt(r.playTime) || 0), 0);
-    const receiveTotal   = state.receiveRecords.length;
-    const receiveMonth   = state.receiveRecords.filter(r => r.date.startsWith(thisMonth)).length;
+    const startMonth     = state.statsStartMonth || null; /* "YYYY-MM" or null */
+
+    /* 集計開始月フィルター（startMonthがあればそれ以降のみ対象） */
+    const giveFiltered    = startMonth ? state.records.filter(r => r.date >= startMonth) : state.records;
+    const receiveFiltered = startMonth ? state.receiveRecords.filter(r => r.date >= startMonth) : state.receiveRecords;
+
+    const total          = giveFiltered.length;
+    const monthCount     = giveFiltered.filter(r => r.date.startsWith(thisMonth)).length;
+    const totalTime      = giveFiltered.reduce((s, r) => s + (parseInt(r.playTime) || 0), 0);
+    const receiveTotal   = receiveFiltered.length;
+    const receiveMonth   = receiveFiltered.filter(r => r.date.startsWith(thisMonth)).length;
 
     /* 施光タブのサマリーカード */
     const elTotal = document.getElementById('total-records');
@@ -58,22 +64,22 @@ window.updateStats = function () {
     const adminBtn = el('stat-tab-admin');
     if (adminBtn) adminBtn.classList.toggle('hidden', state.currentUser?.uid !== ADMIN_UID);
 
-    /* 各セクション描画 */
-    renderPeopleStats();
-    renderReceivePeopleStats();
-    renderMonthlyStats();
-    renderYearlyStats();
+    /* 各セクション描画（フィルター済み配列を渡す） */
+    renderPeopleStats(giveFiltered);
+    renderReceivePeopleStats(receiveFiltered);
+    renderMonthlyStats(giveFiltered, receiveFiltered);
+    renderYearlyStats(giveFiltered, receiveFiltered);
 };
 
 /* ===================== 施光 — 人別 ===================== */
 
-function renderPeopleStats() {
+function renderPeopleStats(records) {
     const div = document.getElementById('people-stats');
     if (!div) return;
     div.innerHTML = '';
 
     const peopleStats = {};
-    state.records.forEach(r => {
+    records.forEach(r => {
         if (!peopleStats[r.person]) peopleStats[r.person] = { count: 0, totalTime: 0 };
         peopleStats[r.person].count++;
         if (r.playTime) peopleStats[r.person].totalTime += parseInt(r.playTime) || 0;
@@ -84,7 +90,7 @@ function renderPeopleStats() {
         return;
     }
 
-    const mikuniteCount = state.records.filter(r => r.types && r.types.includes('未組手')).length;
+    const mikuniteCount = records.filter(r => r.types && r.types.includes('未組手')).length;
     if (mikuniteCount > 0) {
         const mdiv = document.createElement('div');
         mdiv.className = 'stat-row';
@@ -94,7 +100,7 @@ function renderPeopleStats() {
     }
 
     Object.entries(peopleStats).sort(([, a], [, b]) => b.count - a.count).forEach(([person, stats]) => {
-        const isMikunite = state.records.some(r => r.person === person && r.types && r.types.includes('未組手'));
+        const isMikunite = records.some(r => r.person === person && r.types && r.types.includes('未組手'));
         const row = document.createElement('div');
         row.className = 'stat-row';
         row.innerHTML = `
@@ -113,13 +119,13 @@ function renderPeopleStats() {
 
 /* ===================== 受光 — 人別 ===================== */
 
-function renderReceivePeopleStats() {
+function renderReceivePeopleStats(records) {
     const div = document.getElementById('receive-people-stats');
     if (!div) return;
     div.innerHTML = '';
 
     const receiveStats = {};
-    state.receiveRecords.forEach(r => {
+    records.forEach(r => {
         if (!receiveStats[r.person]) receiveStats[r.person] = { count: 0, totalTime: 0 };
         receiveStats[r.person].count++;
         if (r.receiveTime) receiveStats[r.person].totalTime += parseInt(r.receiveTime) || 0;
@@ -145,17 +151,17 @@ function renderReceivePeopleStats() {
 
 /* ===================== 月別統計 ===================== */
 
-function renderMonthlyStats() {
+function renderMonthlyStats(giveRecords, receiveRecords) {
     const div = document.getElementById('monthly-stats');
     if (!div) return;
     div.innerHTML = '';
 
     const giveMap = {}, receiveMap = {};
-    state.records.forEach(r => {
+    giveRecords.forEach(r => {
         const k = r.date.substring(0, 7);
         giveMap[k] = (giveMap[k] || 0) + 1;
     });
-    state.receiveRecords.forEach(r => {
+    receiveRecords.forEach(r => {
         const k = r.date.substring(0, 7);
         receiveMap[k] = (receiveMap[k] || 0) + 1;
     });
@@ -189,17 +195,17 @@ function renderMonthlyStats() {
 
 /* ===================== 年別統計 ===================== */
 
-function renderYearlyStats() {
+function renderYearlyStats(giveRecords, receiveRecords) {
     const div = document.getElementById('yearly-stats');
     if (!div) return;
     div.innerHTML = '';
 
     const giveMap = {}, receiveMap = {};
-    state.records.forEach(r => {
+    giveRecords.forEach(r => {
         const k = r.date.substring(0, 4);
         giveMap[k] = (giveMap[k] || 0) + 1;
     });
-    state.receiveRecords.forEach(r => {
+    receiveRecords.forEach(r => {
         const k = r.date.substring(0, 4);
         receiveMap[k] = (receiveMap[k] || 0) + 1;
     });
