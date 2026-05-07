@@ -1,9 +1,1 @@
-# マニュアル・開発用ドキュメント（GitHubには含めない）
-manuals/
-
-# メンテナンス用ページ
-tekazashi-app-ForMentenance.html
-
-# 念のため個別指定
-manuals/*.pdf
-*.pptx
+# 特に除外するファイルはありません
