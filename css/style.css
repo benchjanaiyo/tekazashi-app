@@ -360,7 +360,8 @@ body {
 
 /* ===== 統計 ===== */
 .stats-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
-.stats-card  { background: var(--blue-50); border: 1px solid var(--blue-200); border-radius: var(--radius); padding: 16px; text-align: center; }
+.stats-card         { background: var(--blue-50);  border: 1px solid var(--blue-200); border-radius: var(--radius); padding: 16px; text-align: center; }
+.stats-card.receive { background: var(--green-50); border-color: #bbf7d0; }
 .stats-card .sc-label { font-size: 13px; font-weight: 500; color: var(--blue-700); margin-bottom: 6px; }
 .stats-card .sc-value { font-size: 28px; font-weight: 700; color: var(--blue-800); }
 .stats-section       { background: #fff; border: 1px solid var(--gray-200); border-radius: var(--radius-lg); padding: 18px; margin-bottom: 16px; }

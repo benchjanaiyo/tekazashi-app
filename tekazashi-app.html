@@ -236,27 +236,66 @@
 
     <!-- 統計タブ -->
     <div id="view-stats" class="tab-content">
+        <!-- サマリーカード -->
         <div class="stats-cards">
             <div class="stats-card">
-                <div class="sc-label">総施光回数</div>
+                <div class="sc-label">施光 累計</div>
                 <div class="sc-value" id="stats-total-records">0回</div>
             </div>
             <div class="stats-card">
-                <div class="sc-label">総施光時間</div>
-                <div class="sc-value" id="stats-total-time">0分</div>
+                <div class="sc-label">施光 今月</div>
+                <div class="sc-value" id="stats-month-records">0回</div>
+            </div>
+            <div class="stats-card receive">
+                <div class="sc-label">受光 累計</div>
+                <div class="sc-value" id="stats-receive-total">0回</div>
+            </div>
+            <div class="stats-card receive">
+                <div class="sc-label">受光 今月</div>
+                <div class="sc-value" id="stats-receive-month">0回</div>
             </div>
         </div>
-        <div class="stats-section">
-            <div class="stats-section-title">人別統計</div>
-            <div id="people-stats"></div>
+
+        <!-- サブタブ -->
+        <div class="cal-subtab-bar">
+            <button id="stat-tab-people"  class="cal-subtab active" onclick="switchStatTab('people')">人別</button>
+            <button id="stat-tab-monthly" class="cal-subtab"        onclick="switchStatTab('monthly')">月別</button>
+            <button id="stat-tab-yearly"  class="cal-subtab"        onclick="switchStatTab('yearly')">年別</button>
+            <button id="stat-tab-admin"   class="cal-subtab hidden" onclick="switchStatTab('admin')">👑利用状況</button>
         </div>
-        <div class="stats-section">
-            <div class="stats-section-title">月別統計</div>
-            <div id="monthly-stats"></div>
+
+        <!-- 人別 -->
+        <div id="stat-view-people">
+            <div class="stats-section">
+                <div class="stats-section-title">施光 — 人別</div>
+                <div id="people-stats"></div>
+            </div>
+            <div class="stats-section">
+                <div class="stats-section-title">受光 — 人別</div>
+                <div id="receive-people-stats"></div>
+            </div>
         </div>
-        <div id="admin-usage-section" class="stats-section hidden">
-            <div class="stats-section-title">👑 メンバー利用状況（管理者専用）</div>
-            <div id="admin-usage-list"></div>
+
+        <!-- 月別 -->
+        <div id="stat-view-monthly" class="hidden">
+            <div class="stats-section">
+                <div id="monthly-stats"></div>
+            </div>
+        </div>
+
+        <!-- 年別 -->
+        <div id="stat-view-yearly" class="hidden">
+            <div class="stats-section">
+                <div id="yearly-stats"></div>
+            </div>
+        </div>
+
+        <!-- 利用状況（管理者） -->
+        <div id="stat-view-admin" class="hidden">
+            <div id="admin-usage-section" class="stats-section hidden">
+                <div class="stats-section-title">👑 メンバー利用状況（管理者専用）</div>
+                <div id="admin-usage-list"></div>
+            </div>
         </div>
     </div>
 
