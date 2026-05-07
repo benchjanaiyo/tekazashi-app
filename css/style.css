@@ -335,6 +335,11 @@ body {
     transition: all 0.15s;
 }
 .cal-filter-btn.cal-filter-active { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+
+.chart-toggle-btn { padding:5px 14px; font-size:13px; font-weight:500; background:var(--gray-100); border:1px solid var(--gray-300); border-radius:16px; color:var(--gray-600); cursor:pointer; transition:all 0.15s; }
+.chart-toggle-btn.active-blue  { background:var(--blue-600);  color:white; border-color:var(--blue-600); }
+.chart-toggle-btn.active-green { background:var(--green-600); color:white; border-color:var(--green-600); }
+.chart-toggle-btn.active-stack { background:var(--gray-700);  color:white; border-color:var(--gray-700); }
 .cal-label-filtered { background: #fee2e2 !important; color: #991b1b !important; border: 1px solid #fca5a5 !important; }
 
 /* ===== 履歴確認ボタン ===== */

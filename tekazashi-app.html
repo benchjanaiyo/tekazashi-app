@@ -11,6 +11,7 @@
     <link rel="apple-touch-icon" href="https://em-content.zobj.net/source/apple/391/palms-up-together_1f932.png">
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script type="module" src="js/main.js"></script>
 </head>
 <body>
@@ -268,6 +269,9 @@
         <!-- 人別 -->
         <div id="stat-view-people">
             <div class="stats-section">
+                <div id="people-chart-container" style="position:relative;"></div>
+            </div>
+            <div class="stats-section">
                 <div class="stats-section-title">施光</div>
                 <div id="people-stats"></div>
             </div>
@@ -279,6 +283,20 @@
 
         <!-- 月別 -->
         <div id="stat-view-monthly" class="hidden">
+            <div class="stats-section">
+                <div style="display:flex;gap:6px;margin-bottom:12px;">
+                    <button id="chart-monthly-give"    class="chart-toggle-btn active-blue" onclick="setMonthlyChartMode('give')">施光</button>
+                    <button id="chart-monthly-receive" class="chart-toggle-btn"             onclick="setMonthlyChartMode('receive')">受光</button>
+                    <button id="chart-monthly-stack"   class="chart-toggle-btn"             onclick="setMonthlyChartMode('stack')">積み上げ</button>
+                </div>
+                <div id="monthly-chart-container" style="position:relative;"></div>
+            </div>
+            <div class="stats-section">
+                <div class="stats-section-title" style="font-size:13px;margin-bottom:8px;">累積推移</div>
+                <div style="position:relative;height:180px;">
+                    <canvas id="cumulative-chart"></canvas>
+                </div>
+            </div>
             <div class="stats-section">
                 <div id="monthly-stats"></div>
             </div>

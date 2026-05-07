@@ -11,6 +11,31 @@ import { db, ADMIN_UID, state }          from './config.js';
 import { escapeHtml, getToday }          from './utils.js';
 import { collection, getDocsFromServer } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+/* ===================== チャートインスタンス管理 ===================== */
+
+let monthlyChartInst    = null;
+let cumulativeChartInst = null;
+let peopleChartInst     = null;
+let monthlyChartMode    = 'give'; /* 'give' | 'receive' | 'stack' */
+
+/* 現在アクティブな統計サブタブ名を返す */
+function currentStatTab() {
+    for (const t of ['people', 'monthly', 'yearly', 'admin']) {
+        const btn = document.getElementById('stat-tab-' + t);
+        if (btn && btn.classList.contains('active')) return t;
+    }
+    return 'people';
+}
+
+/* フィルター済み配列を返す共通ヘルパー */
+function filteredRecords() {
+    const start = state.statsStartMonth || null;
+    return {
+        give:    start ? state.records.filter(r => r.date >= start)        : state.records,
+        receive: start ? state.receiveRecords.filter(r => r.date >= start) : state.receiveRecords
+    };
+}
+
 /* ===================== サブタブ切り替え ===================== */
 
 window.switchStatTab = function (tab) {
@@ -20,7 +45,26 @@ window.switchStatTab = function (tab) {
         if (btn)  btn.classList.toggle('active', t === tab);
         if (view) view.classList.toggle('hidden', t !== tab);
     });
-    if (tab === 'admin') window.loadUsageLogs && window.loadUsageLogs();
+    /* タブが表示状態になってからチャートを描画 */
+    const { give, receive } = filteredRecords();
+    if (tab === 'people')  renderPeopleChart(give);
+    if (tab === 'monthly') { renderMonthlyChart(give, receive); renderCumulativeChart(give, receive); }
+    if (tab === 'admin')   window.loadUsageLogs && window.loadUsageLogs();
+};
+
+/* ===================== 月別グラフ モード切替 ===================== */
+
+window.setMonthlyChartMode = function (mode) {
+    monthlyChartMode = mode;
+    const styles = { give: 'active-blue', receive: 'active-green', stack: 'active-stack' };
+    ['give', 'receive', 'stack'].forEach(m => {
+        const btn = document.getElementById('chart-monthly-' + m);
+        if (!btn) return;
+        btn.classList.remove('active-blue', 'active-green', 'active-stack');
+        if (m === mode) btn.classList.add(styles[m]);
+    });
+    const { give, receive } = filteredRecords();
+    renderMonthlyChart(give, receive);
 };
 
 /* ===================== 統計集計と画面更新 ===================== */
@@ -69,6 +113,11 @@ window.updateStats = function () {
     renderReceivePeopleStats(receiveFiltered);
     renderMonthlyStats(giveFiltered, receiveFiltered);
     renderYearlyStats(giveFiltered, receiveFiltered);
+
+    /* チャートは表示中のタブのみ描画（非表示キャンバスはサイズ0になるため） */
+    const tab = currentStatTab();
+    if (tab === 'people')  renderPeopleChart(giveFiltered);
+    if (tab === 'monthly') { renderMonthlyChart(giveFiltered, receiveFiltered); renderCumulativeChart(giveFiltered, receiveFiltered); }
 };
 
 /* ===================== 施光 — 人別 ===================== */
@@ -234,6 +283,123 @@ function renderYearlyStats(giveRecords, receiveRecords) {
             <span style="width:56px;text-align:right;color:var(--blue-700);">${giveMap[year] || 0}回</span>
             <span style="width:56px;text-align:right;color:var(--green-700);">${receiveMap[year] || 0}回</span>`;
         div.appendChild(row);
+    });
+}
+
+/* ===================== 人別グラフ（B） ===================== */
+
+function renderPeopleChart(records) {
+    const container = document.getElementById('people-chart-container');
+    if (!container || typeof Chart === 'undefined') return;
+
+    const countMap = {};
+    records.forEach(r => { countMap[r.person] = (countMap[r.person] || 0) + 1; });
+    const sorted = Object.entries(countMap).sort(([, a], [, b]) => a - b); /* 昇順＝上から少ない順（Chart.jsは配列先頭が上） */
+    const labels = sorted.map(([name]) => name);
+    const data   = sorted.map(([, c]) => c);
+
+    const h = Math.max(150, labels.length * 34 + 20);
+    container.style.height = h + 'px';
+
+    /* 既存のキャンバスを作り直す */
+    container.innerHTML = '<canvas id="people-chart"></canvas>';
+    if (peopleChartInst) { peopleChartInst.destroy(); peopleChartInst = null; }
+
+    peopleChartInst = new Chart(document.getElementById('people-chart'), {
+        type: 'bar',
+        data: { labels, datasets: [{ data, backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 4 }] },
+        options: {
+            indexAxis: 'y', maintainAspectRatio: false, responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } } },
+                y: { ticks: { font: { size: 13 } } }
+            }
+        }
+    });
+}
+
+/* ===================== 月別グラフ（A） ===================== */
+
+function renderMonthlyChart(giveRecords, receiveRecords) {
+    const container = document.getElementById('monthly-chart-container');
+    if (!container || typeof Chart === 'undefined') return;
+
+    const giveMap = {}, receiveMap = {};
+    giveRecords.forEach(r    => { const k = r.date.substring(0, 7); giveMap[k]    = (giveMap[k]    || 0) + 1; });
+    receiveRecords.forEach(r => { const k = r.date.substring(0, 7); receiveMap[k] = (receiveMap[k] || 0) + 1; });
+    const months = [...new Set([...Object.keys(giveMap), ...Object.keys(receiveMap)])].sort();
+    const labels     = months.map(m => m.replace('-', '/'));
+    const giveData   = months.map(m => giveMap[m]    || 0);
+    const receiveData = months.map(m => receiveMap[m] || 0);
+
+    const h = Math.max(180, months.length * 34 + 20);
+    container.style.height = h + 'px';
+    container.innerHTML = '<canvas id="monthly-chart"></canvas>';
+    if (monthlyChartInst) { monthlyChartInst.destroy(); monthlyChartInst = null; }
+
+    const mode = monthlyChartMode;
+    let datasets;
+    if (mode === 'give') {
+        datasets = [{ data: giveData,    backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 4 }];
+    } else if (mode === 'receive') {
+        datasets = [{ data: receiveData, backgroundColor: 'rgba(22,163,74,0.7)',  borderRadius: 4 }];
+    } else {
+        datasets = [
+            { label: '施光', data: giveData,    backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 4, stack: 'a' },
+            { label: '受光', data: receiveData, backgroundColor: 'rgba(22,163,74,0.7)',  borderRadius: 4, stack: 'a' }
+        ];
+    }
+
+    monthlyChartInst = new Chart(document.getElementById('monthly-chart'), {
+        type: 'bar',
+        data: { labels, datasets },
+        options: {
+            indexAxis: 'y', maintainAspectRatio: false, responsive: true,
+            plugins: { legend: { display: mode === 'stack', position: 'top', labels: { boxWidth: 12, font: { size: 12 } } } },
+            scales: {
+                x: { beginAtZero: true, stacked: mode === 'stack', ticks: { precision: 0, font: { size: 11 } } },
+                y: { stacked: mode === 'stack', ticks: { font: { size: 12 } } }
+            }
+        }
+    });
+}
+
+/* ===================== 累積折れ線グラフ（C） ===================== */
+
+function renderCumulativeChart(giveRecords, receiveRecords) {
+    const canvas = document.getElementById('cumulative-chart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const giveMap = {}, receiveMap = {};
+    giveRecords.forEach(r    => { const k = r.date.substring(0, 7); giveMap[k]    = (giveMap[k]    || 0) + 1; });
+    receiveRecords.forEach(r => { const k = r.date.substring(0, 7); receiveMap[k] = (receiveMap[k] || 0) + 1; });
+    const months = [...new Set([...Object.keys(giveMap), ...Object.keys(receiveMap)])].sort();
+    const labels = months.map(m => m.replace('-', '/'));
+
+    let gc = 0, rc = 0;
+    const giveData    = months.map(m => { gc += (giveMap[m]    || 0); return gc; });
+    const receiveData = months.map(m => { rc += (receiveMap[m] || 0); return rc; });
+
+    if (cumulativeChartInst) { cumulativeChartInst.destroy(); cumulativeChartInst = null; }
+
+    cumulativeChartInst = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: '施光', data: giveData,    borderColor: 'rgb(37,99,235)',  backgroundColor: 'rgba(37,99,235,0.08)', fill: true, tension: 0.3, pointRadius: 3 },
+                { label: '受光', data: receiveData, borderColor: 'rgb(22,163,74)',  backgroundColor: 'rgba(22,163,74,0.08)',  fill: true, tension: 0.3, pointRadius: 3 }
+            ]
+        },
+        options: {
+            maintainAspectRatio: false, responsive: true,
+            plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 12 } } } },
+            scales: {
+                x: { ticks: { font: { size: 11 }, maxRotation: 45 } },
+                y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } } }
+            }
+        }
     });
 }
 
