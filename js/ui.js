@@ -144,10 +144,23 @@ window.loadUserSubtitle = async function () {
 
 /* 集計開始月をUIに反映する（ラベル・統計タブの期間テキスト） */
 function applyStatsStartMonth() {
-    const m = state.statsStartMonth;
+    const m    = state.statsStartMonth;
+    const term = m ? `（${m.replace('-', '/')}〜）` : '';
+
     /* 施光タブの累計ラベル */
     const giveLabel = document.getElementById('give-total-label');
-    if (giveLabel) giveLabel.textContent = m ? `累計（${m.replace('-', '/')}〜）` : '累計';
+    if (giveLabel) giveLabel.textContent = '累計' + term;
+
+    /* 受光タブの累計ラベル */
+    const receiveLabel = document.getElementById('receive-total-label');
+    if (receiveLabel) receiveLabel.textContent = '累計' + term;
+
+    /* 統計タブの施光累計・受光累計ラベル */
+    const statsGiveLabel    = document.getElementById('stats-give-total-label');
+    const statsReceiveLabel = document.getElementById('stats-receive-total-label');
+    if (statsGiveLabel)    statsGiveLabel.textContent    = '施光 累計' + term;
+    if (statsReceiveLabel) statsReceiveLabel.textContent = '受光 累計' + term;
+
     /* 統計タブの集計期間テキスト */
     const periodLabel = document.getElementById('stats-period-label');
     if (periodLabel) periodLabel.textContent = m ? `集計期間：${m.replace('-', '/')}〜` : '';
