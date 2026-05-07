@@ -4,5 +4,5 @@ git add -A
 git commit -m "update"
 git push origin test --force
 echo.
-echo === プッシュ完了 ===
+echo === Push Done ===
 pause
