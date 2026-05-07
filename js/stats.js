@@ -47,7 +47,6 @@ window.switchStatTab = function (tab) {
     });
     /* タブが表示状態になってからチャートを描画 */
     const { give, receive } = filteredRecords();
-    if (tab === 'people')  renderPeopleChart(give);
     if (tab === 'monthly') { renderMonthlyChart(give, receive); renderCumulativeChart(give, receive); }
     if (tab === 'admin')   window.loadUsageLogs && window.loadUsageLogs();
 };
@@ -116,7 +115,6 @@ window.updateStats = function () {
 
     /* チャートは表示中のタブのみ描画（非表示キャンバスはサイズ0になるため） */
     const tab = currentStatTab();
-    if (tab === 'people')  renderPeopleChart(giveFiltered);
     if (tab === 'monthly') { renderMonthlyChart(giveFiltered, receiveFiltered); renderCumulativeChart(giveFiltered, receiveFiltered); }
 };
 
@@ -333,21 +331,20 @@ function renderMonthlyChart(giveRecords, receiveRecords) {
     const giveData   = months.map(m => giveMap[m]    || 0);
     const receiveData = months.map(m => receiveMap[m] || 0);
 
-    const h = Math.max(180, months.length * 34 + 20);
-    container.style.height = h + 'px';
+    container.style.height = '220px';
     container.innerHTML = '<canvas id="monthly-chart"></canvas>';
     if (monthlyChartInst) { monthlyChartInst.destroy(); monthlyChartInst = null; }
 
     const mode = monthlyChartMode;
     let datasets;
     if (mode === 'give') {
-        datasets = [{ data: giveData,    backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 4 }];
+        datasets = [{ data: giveData,    backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 3 }];
     } else if (mode === 'receive') {
-        datasets = [{ data: receiveData, backgroundColor: 'rgba(22,163,74,0.7)',  borderRadius: 4 }];
+        datasets = [{ data: receiveData, backgroundColor: 'rgba(22,163,74,0.7)',  borderRadius: 3 }];
     } else {
         datasets = [
-            { label: '施光', data: giveData,    backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 4, stack: 'a' },
-            { label: '受光', data: receiveData, backgroundColor: 'rgba(22,163,74,0.7)',  borderRadius: 4, stack: 'a' }
+            { label: '施光', data: giveData,    backgroundColor: 'rgba(37,99,235,0.7)', borderRadius: 3, stack: 'a' },
+            { label: '受光', data: receiveData, backgroundColor: 'rgba(22,163,74,0.7)',  borderRadius: 3, stack: 'a' }
         ];
     }
 
@@ -355,11 +352,11 @@ function renderMonthlyChart(giveRecords, receiveRecords) {
         type: 'bar',
         data: { labels, datasets },
         options: {
-            indexAxis: 'y', maintainAspectRatio: false, responsive: true,
+            maintainAspectRatio: false, responsive: true,
             plugins: { legend: { display: mode === 'stack', position: 'top', labels: { boxWidth: 12, font: { size: 12 } } } },
             scales: {
-                x: { beginAtZero: true, stacked: mode === 'stack', ticks: { precision: 0, font: { size: 11 } } },
-                y: { stacked: mode === 'stack', ticks: { font: { size: 12 } } }
+                x: { stacked: mode === 'stack', ticks: { font: { size: 11 }, maxRotation: 45 } },
+                y: { beginAtZero: true, stacked: mode === 'stack', ticks: { precision: 0, font: { size: 11 } } }
             }
         }
     });
