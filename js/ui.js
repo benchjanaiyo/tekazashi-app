@@ -139,7 +139,7 @@ window.loadUserSubtitle = async function () {
         /* 集計開始月 */
         state.statsStartMonth = data.statsStartMonth || null;
         applyStatsStartMonth();
-    } catch (e) { /* 取得失敗時はデフォルトのまま */ }
+    } catch (e) { console.warn('ユーザー設定の取得に失敗:', e); }
 };
 
 /* 集計開始月をUIに反映する（ラベル・統計タブの期間テキスト） */
@@ -209,13 +209,21 @@ window.clearStatsStartMonth = async function () {
 
 /* ===================== UID コピー ===================== */
 
-window.copyUID = function () {
+window.copyUID = function (e) {
     const uid = state.currentUser?.uid || '';
-    navigator.clipboard.writeText(uid).then(() => {
-        const btn = event.target;
+    const btn = e && e.currentTarget;
+    const flash = () => {
+        if (!btn) return;
         btn.textContent = 'コピー済';
         setTimeout(() => btn.textContent = 'コピー', 2000);
-    });
+    };
+    /* clipboard API → 失敗したら手動コピー用に prompt() でフォールバック */
+    const fallback = () => { window.prompt('UIDをコピーしてください', uid); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(uid).then(flash).catch(fallback);
+    } else {
+        fallback();
+    }
 };
 
 /* ===================== 場所サジェスト ===================== */

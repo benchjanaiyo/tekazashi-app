@@ -150,16 +150,38 @@ function renderPeopleStats(records) {
         const isMikunite = records.some(r => r.person === person && r.types && r.types.includes('未組手'));
         const row = document.createElement('div');
         row.className = 'stat-row';
-        row.innerHTML = `
-            <span class="stat-name">${escapeHtml(person)}${isMikunite ? ' <span style="font-size:12px;background:#fef9c3;color:#854d0e;padding:1px 6px;border-radius:8px;">未組手</span>' : ''}</span>
-            <div style="display:flex;align-items:center;gap:10px;">
-                <div class="stat-nums">
-                    <span>${stats.count}回</span>
-                    ${stats.totalTime > 0 ? `<span>計${stats.totalTime}分</span>` : ''}
-                </div>
-                <button onclick="showMemoModal('${escapeHtml(person)}')"
-                    style="padding:4px 10px;font-size:12px;background:var(--blue-50);border:1px solid var(--blue-200);color:var(--blue-700);border-radius:8px;cursor:pointer;white-space:nowrap;">📋 履歴</button>
-            </div>`;
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className   = 'stat-name';
+        nameSpan.textContent = person;
+        if (isMikunite) {
+            const tag = document.createElement('span');
+            tag.style.cssText = 'font-size:12px;background:#fef9c3;color:#854d0e;padding:1px 6px;border-radius:8px;margin-left:6px;';
+            tag.textContent   = '未組手';
+            nameSpan.appendChild(tag);
+        }
+
+        const right = document.createElement('div');
+        right.style.cssText = 'display:flex;align-items:center;gap:10px;';
+        const nums = document.createElement('div');
+        nums.className = 'stat-nums';
+        const cnt = document.createElement('span');
+        cnt.textContent = stats.count + '回';
+        nums.appendChild(cnt);
+        if (stats.totalTime > 0) {
+            const tm = document.createElement('span');
+            tm.textContent = '計' + stats.totalTime + '分';
+            nums.appendChild(tm);
+        }
+        const btn = document.createElement('button');
+        btn.style.cssText = 'padding:4px 10px;font-size:12px;background:var(--blue-50);border:1px solid var(--blue-200);color:var(--blue-700);border-radius:8px;cursor:pointer;white-space:nowrap;';
+        btn.textContent   = '📋 履歴';
+        btn.addEventListener('click', () => window.showMemoModal(person));
+        right.appendChild(nums);
+        right.appendChild(btn);
+
+        row.appendChild(nameSpan);
+        row.appendChild(right);
         div.appendChild(row);
     });
 }
@@ -186,12 +208,21 @@ function renderReceivePeopleStats(records) {
     Object.entries(receiveStats).sort(([, a], [, b]) => b.count - a.count).forEach(([person, stats]) => {
         const row = document.createElement('div');
         row.className = 'stat-row';
-        row.innerHTML = `
-            <span class="stat-name">${escapeHtml(person)}</span>
-            <div class="stat-nums">
-                <span>${stats.count}回</span>
-                ${stats.totalTime > 0 ? `<span>計${stats.totalTime}分</span>` : ''}
-            </div>`;
+        const nameSpan = document.createElement('span');
+        nameSpan.className   = 'stat-name';
+        nameSpan.textContent = person;
+        const nums = document.createElement('div');
+        nums.className = 'stat-nums';
+        const cnt = document.createElement('span');
+        cnt.textContent = stats.count + '回';
+        nums.appendChild(cnt);
+        if (stats.totalTime > 0) {
+            const tm = document.createElement('span');
+            tm.textContent = '計' + stats.totalTime + '分';
+            nums.appendChild(tm);
+        }
+        row.appendChild(nameSpan);
+        row.appendChild(nums);
         div.appendChild(row);
     });
 }
@@ -410,7 +441,7 @@ window.loadUsageLogs = async function () {
         const logs = snap.docs.map(d => ({ uid: d.id, ...d.data() }))
             .sort((a, b) => (b.recordCount || 0) - (a.recordCount || 0));
         renderUsageLogs(logs);
-    } catch (e) { /* 取得失敗は無視 */ }
+    } catch (e) { console.warn('利用状況の取得に失敗:', e); }
 };
 
 function renderUsageLogs(logs) {

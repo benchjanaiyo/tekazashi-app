@@ -7,8 +7,7 @@
  * ============================================================ */
 
 import { db, state }                   from './config.js';
-import { escapeHtml, showLoading,
-         getToday }                    from './utils.js';
+import { showLoading, getToday }       from './utils.js';
 import { collection, doc, addDoc,
          updateDoc, deleteDoc }        from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -37,18 +36,38 @@ function renderPersonHistory(personName) {
     personRecs.forEach(r => {
         const div = document.createElement('div');
         div.className = 'history-item';
-        div.innerHTML = `
-            <div class="history-date">${r.date}</div>
-            <div style="flex:1;">
-                <div class="history-tags">
-                    ${r.playTime ? `<span class="tag">⏱ ${r.playTime}分</span>` : ''}
-                    ${r.types    ? `<span class="tag bl">${r.types}</span>` : ''}
-                    ${r.location ? `<span class="tag gn">📍 ${escapeHtml(r.location)}</span>` : ''}
-                </div>
-                ${r.memo ? `<div style="font-size:13px;color:var(--gray-600);margin-top:4px;padding:4px 6px;background:#fef9c3;border-radius:6px;">📝 ${escapeHtml(r.memo)}</div>` : ''}
-            </div>`;
+
+        const date = document.createElement('div');
+        date.className   = 'history-date';
+        date.textContent = r.date;
+        div.appendChild(date);
+
+        const right = document.createElement('div');
+        right.style.flex = '1';
+        const tags = document.createElement('div');
+        tags.className = 'history-tags';
+        if (r.playTime) tags.appendChild(makeMemoTag('⏱ ' + r.playTime + '分'));
+        if (r.types)    tags.appendChild(makeMemoTag(r.types, 'bl'));
+        if (r.location) tags.appendChild(makeMemoTag('📍 ' + r.location, 'gn'));
+        right.appendChild(tags);
+        if (r.memo) {
+            const memoBox = document.createElement('div');
+            memoBox.style.cssText = 'font-size:13px;color:var(--gray-600);margin-top:4px;padding:4px 6px;background:#fef9c3;border-radius:6px;';
+            memoBox.textContent   = '📝 ' + r.memo;
+            right.appendChild(memoBox);
+        }
+        div.appendChild(right);
+
         list.appendChild(div);
     });
+}
+
+/* タグ要素を生成（textContent ベースなのでXSS安全） */
+function makeMemoTag(text, variant) {
+    const span = document.createElement('span');
+    span.className   = 'tag' + (variant ? ' ' + variant : '');
+    span.textContent = text;
+    return span;
 }
 
 /* メモリスト（メモモーダル下部） */
@@ -65,17 +84,37 @@ function renderPersonMemos(personName) {
     myMemos.forEach(memo => {
         const div = document.createElement('div');
         div.className = 'memo-item';
-        div.innerHTML = `
-            <div class="memo-item-inner">
-                <div class="memo-item-content">
-                    <span class="memo-date">${memo.memoDate}</span>
-                    <p class="memo-text">${escapeHtml(memo.text)}</p>
-                </div>
-                <div class="memo-item-actions">
-                    <button onclick="editMemoItem('${memo.id}')" class="icon-btn">✏️</button>
-                    <button onclick="deleteMemo('${memo.id}', '${escapeHtml(personName)}')" class="icon-btn danger">🗑️</button>
-                </div>
-            </div>`;
+
+        const inner = document.createElement('div');
+        inner.className = 'memo-item-inner';
+
+        const content = document.createElement('div');
+        content.className = 'memo-item-content';
+        const dateSpan = document.createElement('span');
+        dateSpan.className   = 'memo-date';
+        dateSpan.textContent = memo.memoDate;
+        const textP = document.createElement('p');
+        textP.className   = 'memo-text';
+        textP.textContent = memo.text;
+        content.appendChild(dateSpan);
+        content.appendChild(textP);
+
+        const actions = document.createElement('div');
+        actions.className = 'memo-item-actions';
+        const editBtn = document.createElement('button');
+        editBtn.className   = 'icon-btn';
+        editBtn.textContent = '✏️';
+        editBtn.addEventListener('click', () => window.editMemoItem(memo.id));
+        const delBtn = document.createElement('button');
+        delBtn.className   = 'icon-btn danger';
+        delBtn.textContent = '🗑️';
+        delBtn.addEventListener('click', () => window.deleteMemo(memo.id, personName));
+        actions.appendChild(editBtn);
+        actions.appendChild(delBtn);
+
+        inner.appendChild(content);
+        inner.appendChild(actions);
+        div.appendChild(inner);
         list.appendChild(div);
     });
 }

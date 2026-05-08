@@ -7,7 +7,7 @@
  * ============================================================ */
 
 import { db, state }                         from './config.js';
-import { escapeHtml, getSelectedTypes,
+import { getSelectedTypes,
          clearReceiveInputs, saveLocationHistory,
          showLoading, convertToHalfWidth }   from './utils.js';
 import { collection, doc, addDoc,
@@ -17,11 +17,14 @@ import { collection, doc, addDoc,
 
 window.addReceiveRecord = async function () {
     const personName   = document.getElementById('receive-person').value.trim();
-    let   receiveTime  = convertToHalfWidth(document.getElementById('receive-time').value);
+    let   receiveTime  = convertToHalfWidth(document.getElementById('receive-time').value).trim();
     const selectedDate = document.getElementById('receive-selected-date').value;
     const types        = getSelectedTypes('receive-type');
     const location     = document.getElementById('receive-location').value.trim();
     if (!personName || !selectedDate) { alert('名前と日付を入力してください'); return; }
+    if (receiveTime && !/^\d+$/.test(receiveTime)) {
+        alert('受光時間は数字で入力してください'); return;
+    }
     showLoading(true);
     try {
         const newRecord = {
@@ -63,23 +66,30 @@ window.editReceiveRecord = function (record) {
     ['edit-receive-type-8', 'edit-receive-type-7', 'edit-receive-type-6', 'edit-receive-type-1'].forEach(id =>
         document.getElementById(id).checked = false);
     if (record.types) {
-        record.types.split(' ').forEach(t => {
-            if      (t === '⑧') document.getElementById('edit-receive-type-8').checked = true;
-            else if (t === '⑦') document.getElementById('edit-receive-type-7').checked = true;
-            else if (t === '⑥') document.getElementById('edit-receive-type-6').checked = true;
-            else if (t === '①') document.getElementById('edit-receive-type-1').checked = true;
-            else if (t)          document.getElementById('edit-receive-type-custom').value = t;
+        /* 既知タイプを順にチェック→残りをすべて custom 扱いに（空白を含む custom 入力に対応） */
+        const known = { '⑧': 'edit-receive-type-8', '⑦': 'edit-receive-type-7', '⑥': 'edit-receive-type-6', '①': 'edit-receive-type-1' };
+        const tokens = record.types.split(' ');
+        const remain = [];
+        tokens.forEach(t => {
+            if (known[t]) document.getElementById(known[t]).checked = true;
+            else if (t)   remain.push(t);
         });
+        if (remain.length) document.getElementById('edit-receive-type-custom').value = remain.join(' ');
     }
     window.openModal('edit-receive-modal');
 };
 
 window.updateReceiveRecord = async function () {
     if (!state.editingReceiveRecord) return;
-    let receiveTime = convertToHalfWidth(document.getElementById('edit-receive-time').value);
+    let receiveTime = convertToHalfWidth(document.getElementById('edit-receive-time').value).trim();
+    const person = document.getElementById('edit-receive-person').value.trim();
+    const date   = document.getElementById('edit-receive-date').value;
+    if (!person || !date) { alert('名前と日付を入力してください'); return; }
+    if (receiveTime && !/^\d+$/.test(receiveTime)) {
+        alert('受光時間は数字で入力してください'); return;
+    }
     const updated = {
-        person:      document.getElementById('edit-receive-person').value,
-        date:        document.getElementById('edit-receive-date').value,
+        person, date,
         receiveTime: receiveTime || null,
         types:       getSelectedTypes('edit-receive-type'),
         location:    document.getElementById('edit-receive-location').value.trim()
@@ -113,24 +123,9 @@ window.updateTodaysReceiveRecords = function () {
         container.classList.remove('hidden');
         title.textContent = selectedDate + 'の受光';
         list.innerHTML = '';
+        /* records.js の buildRecordCard を再利用してXSSを根絶 */
         todaysRecords.forEach(record => {
-            const div = document.createElement('div');
-            div.className = 'record-card receive';
-            div.innerHTML = `
-                <div class="record-info">
-                    <span class="record-name">${escapeHtml(record.person)}から</span>
-                    <div class="record-tags">
-                        ${record.receiveTime ? `<span class="tag">⏱ ${record.receiveTime}分</span>` : ''}
-                        ${record.types       ? `<span class="tag green">${record.types}</span>` : ''}
-                        ${record.location    ? `<span class="tag green">📍 ${escapeHtml(record.location)}</span>` : ''}
-                    </div>
-                </div>
-                <div class="record-actions">
-                    <button class="icon-btn edit-receive-btn">✏️</button>
-                    <button onclick="deleteReceiveRecord('${record.id}')" class="icon-btn danger">🗑️</button>
-                </div>`;
-            div.querySelector('.edit-receive-btn').addEventListener('click', () => window.editReceiveRecord(record));
-            list.appendChild(div);
+            list.appendChild(window._buildRecordCard(record, 'receive'));
         });
     } else {
         container.classList.add('hidden');

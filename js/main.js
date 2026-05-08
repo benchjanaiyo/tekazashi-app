@@ -87,20 +87,20 @@ async function loadAllData() {
 /* ===================== 利用状況ログの更新 ===================== */
 
 /* increment() で読み取りなしに loginCount をインクリメントする
- * （一般ユーザーは usageLogs の読み取り権限がないため、setDoc+increment を使用） */
+ * （一般ユーザーは usageLogs の読み取り権限がないため、setDoc+increment を使用）
+ * email は個人情報集約を避けるため保存しない（displayName だけで識別可能） */
 async function updateUsageLog() {
     try {
         const logRef = doc(db, 'usageLogs', state.currentUser.uid);
         await setDoc(logRef, {
-            name:         state.currentUser.displayName || state.currentUser.email,
-            email:        state.currentUser.email,
+            name:         state.currentUser.displayName || '(no name)',
             lastLogin:    getToday(),
             loginCount:   increment(1),
             recordCount:  state.records.length,
             receiveCount: state.receiveRecords.length,
             updatedAt:    new Date().toISOString()
         }, { merge: true });
-    } catch (e) { /* ログ更新失敗は無視 */ }
+    } catch (e) { console.warn('利用ログ更新に失敗:', e); }
 }
 
 /* ===================== 表示全体更新 ===================== */

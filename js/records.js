@@ -7,7 +7,7 @@
  * ============================================================ */
 
 import { db, state }                        from './config.js';
-import { escapeHtml, getSelectedTypes,
+import { getSelectedTypes,
          clearInputs, saveLocationHistory,
          showLoading, convertToHalfWidth }  from './utils.js';
 import { collection, doc, addDoc,
@@ -17,15 +17,22 @@ import { collection, doc, addDoc,
 
 window.addNewPerson = async function () {
     const personName   = document.getElementById('person-name').value.trim();
-    let   playTime     = convertToHalfWidth(document.getElementById('play-time').value);
+    let   playTime     = convertToHalfWidth(document.getElementById('play-time').value).trim();
     const selectedDate = document.getElementById('selected-date').value;
     const types        = getSelectedTypes('type');
     const location     = document.getElementById('location').value.trim();
     const memo         = document.getElementById('give-memo').value.trim();
     if (!personName || !selectedDate) { alert('名前と日付を入力してください'); return; }
+    /* playTime は空欄OK・数値ならOK・それ以外は拒否 */
+    if (playTime && !/^\d+$/.test(playTime)) {
+        alert('施光時間は数字で入力してください'); return;
+    }
 
-    /* 同日同名が既存なら重複確認モーダルを表示 */
-    const isDuplicate = state.records.some(r => r.person === personName && r.date === selectedDate);
+    /* 日付・名前・種類が全一致する既存記録があれば重複確認モーダルを表示
+     * （種類が違えば別記録として扱う — 例：⑦と⑧で別々に追加できる） */
+    const isDuplicate = state.records.some(r =>
+        r.person === personName && r.date === selectedDate &&
+        (r.types || '') === (types || ''));
     if (isDuplicate) {
         state.duplicateInfo = { person: personName, date: selectedDate, playTime, types, location, memo };
         document.getElementById('duplicate-message').textContent =
@@ -88,24 +95,30 @@ window.editRecord = function (record) {
     ['edit-type-8', 'edit-type-7', 'edit-type-6', 'edit-type-1', 'edit-type-mikunite'].forEach(id =>
         document.getElementById(id).checked = false);
     if (record.types) {
-        record.types.split(' ').forEach(t => {
-            if      (t === '⑧')    document.getElementById('edit-type-8').checked = true;
-            else if (t === '⑦')    document.getElementById('edit-type-7').checked = true;
-            else if (t === '⑥')    document.getElementById('edit-type-6').checked = true;
-            else if (t === '①')    document.getElementById('edit-type-1').checked = true;
-            else if (t === '未組手') document.getElementById('edit-type-mikunite').checked = true;
-            else if (t)             document.getElementById('edit-type-custom').value = t;
+        /* 既知タイプを順にチェック→残りをすべて custom 扱いに（空白を含む custom 入力に対応） */
+        const known = { '⑧': 'edit-type-8', '⑦': 'edit-type-7', '⑥': 'edit-type-6', '①': 'edit-type-1', '未組手': 'edit-type-mikunite' };
+        const tokens   = record.types.split(' ');
+        const remain   = [];
+        tokens.forEach(t => {
+            if (known[t]) document.getElementById(known[t]).checked = true;
+            else if (t)   remain.push(t);
         });
+        if (remain.length) document.getElementById('edit-type-custom').value = remain.join(' ');
     }
     window.openModal('edit-modal');
 };
 
 window.updateRecord = async function () {
     if (!state.editingRecord) return;
-    let playTime = convertToHalfWidth(document.getElementById('edit-playtime').value);
+    let playTime = convertToHalfWidth(document.getElementById('edit-playtime').value).trim();
+    const person = document.getElementById('edit-person').value.trim();
+    const date   = document.getElementById('edit-date').value;
+    if (!person || !date) { alert('名前と日付を入力してください'); return; }
+    if (playTime && !/^\d+$/.test(playTime)) {
+        alert('施光時間は数字で入力してください'); return;
+    }
     const updated = {
-        person:   document.getElementById('edit-person').value,
-        date:     document.getElementById('edit-date').value,
+        person, date,
         playTime: playTime || null,
         types:    getSelectedTypes('edit-type'),
         location: document.getElementById('edit-location').value.trim()
@@ -145,28 +158,68 @@ window.updateTodaysGiveRecords = function () {
         title.textContent = selectedDate + 'の施光';
         list.innerHTML = '';
         todaysRecords.forEach(record => {
-            const div = document.createElement('div');
-            div.className = 'record-card give';
-            div.innerHTML = `
-                <div class="record-info">
-                    <span class="record-name">${escapeHtml(record.person)}</span>
-                    <div class="record-tags">
-                        ${record.playTime  ? `<span class="tag">⏱ ${record.playTime}分</span>` : ''}
-                        ${record.types     ? `<span class="tag blue">${record.types}</span>` : ''}
-                        ${record.location  ? `<span class="tag green">📍 ${escapeHtml(record.location)}</span>` : ''}
-                    </div>
-                </div>
-                <div class="record-actions">
-                    <button class="icon-btn edit-give-btn">✏️</button>
-                    <button onclick="deleteRecord('${record.id}')" class="icon-btn danger">🗑️</button>
-                </div>`;
-            div.querySelector('.edit-give-btn').addEventListener('click', () => window.editRecord(record));
-            list.appendChild(div);
+            const card = buildRecordCard(record, 'give');
+            list.appendChild(card);
         });
     } else {
         container.classList.add('hidden');
     }
 };
+
+/* レコードカードDOMをユーザ入力エスケープ済みで構築する（XSS対策） */
+function buildRecordCard(record, kind) {
+    const div = document.createElement('div');
+    div.className = 'record-card ' + kind;
+
+    const info = document.createElement('div');
+    info.className = 'record-info';
+    const name = document.createElement('span');
+    name.className   = 'record-name';
+    name.textContent = kind === 'receive' ? record.person + 'から' : record.person;
+    info.appendChild(name);
+
+    const tags = document.createElement('div');
+    tags.className = 'record-tags';
+    const time = kind === 'receive' ? record.receiveTime : record.playTime;
+    if (time) tags.appendChild(makeTag('⏱ ' + time + '分'));
+    if (record.types) tags.appendChild(makeTag(record.types, kind === 'receive' ? 'green' : 'blue'));
+    if (record.location) tags.appendChild(makeTag('📍 ' + record.location, 'green'));
+    info.appendChild(tags);
+
+    const actions = document.createElement('div');
+    actions.className = 'record-actions';
+    const editBtn = document.createElement('button');
+    editBtn.className   = 'icon-btn';
+    editBtn.textContent = '✏️';
+    editBtn.addEventListener('click', () => {
+        if (kind === 'receive') window.editReceiveRecord(record);
+        else                    window.editRecord(record);
+    });
+    const delBtn = document.createElement('button');
+    delBtn.className   = 'icon-btn danger';
+    delBtn.textContent = '🗑️';
+    delBtn.addEventListener('click', () => {
+        if (kind === 'receive') window.deleteReceiveRecord(record.id);
+        else                    window.deleteRecord(record.id);
+    });
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+
+    div.appendChild(info);
+    div.appendChild(actions);
+    return div;
+}
+
+/* タグ要素を生成（textContent ベースなのでXSS安全） */
+function makeTag(text, variant) {
+    const span = document.createElement('span');
+    span.className   = 'tag' + (variant ? ' ' + variant : '');
+    span.textContent = text;
+    return span;
+}
+
+/* 受光側からも共通カード生成を使えるよう公開 */
+window._buildRecordCard = buildRecordCard;
 
 /* ===================== よく施光する人チップ ===================== */
 
@@ -188,18 +241,27 @@ export function updateRecentPeople() {
             .sort((a, b) => b.memoDate.localeCompare(a.memoDate))[0];
         const wrapper = document.createElement('div');
         wrapper.className = 'person-chip-wrapper';
+
         const btn = document.createElement('button');
-        btn.className = 'person-chip';
-        btn.innerHTML = escapeHtml(name) +
-            (count > 0 ? `<span class="chip-count" title="過去30日の施光回数">${count}回</span>` : '');
+        btn.className   = 'person-chip';
+        btn.textContent = name;
+        if (count > 0) {
+            const cnt = document.createElement('span');
+            cnt.className   = 'chip-count';
+            cnt.title       = '過去30日の施光回数';
+            cnt.textContent = count + '回';
+            btn.appendChild(cnt);
+        }
         btn.onclick = () => { document.getElementById('person-name').value = name; };
+
         const memoBtn = document.createElement('button');
-        memoBtn.className = 'memo-chip' + (myMemoCount > 0 ? ' has-memo' : '');
-        memoBtn.title     = latestMemo
+        memoBtn.className   = 'memo-chip' + (myMemoCount > 0 ? ' has-memo' : '');
+        memoBtn.title       = latestMemo
             ? latestMemo.memoDate + ': ' + latestMemo.text.substring(0, 30)
             : 'メモ・履歴を見る';
         memoBtn.textContent = '📝' + (myMemoCount > 0 ? myMemoCount : '');
         memoBtn.onclick = e => { e.stopPropagation(); window.showMemoModal(name); };
+
         wrapper.appendChild(btn);
         wrapper.appendChild(memoBtn);
         div.appendChild(wrapper);
@@ -216,18 +278,24 @@ window.showHistoryModal = function (personName) {
     const list = document.getElementById('history-list');
     list.innerHTML = '';
     if (personRecords.length === 0) {
-        list.innerHTML = '<p style="text-align:center;color:#9ca3af;padding:20px;font-size:14px;">記録がありません</p>';
+        const p = document.createElement('p');
+        p.style.cssText = 'text-align:center;color:#9ca3af;padding:20px;font-size:14px;';
+        p.textContent   = '記録がありません';
+        list.appendChild(p);
     } else {
         personRecords.forEach(r => {
             const div = document.createElement('div');
             div.className = 'history-item';
-            div.innerHTML = `
-                <div class="history-date">${r.date}</div>
-                <div class="history-tags">
-                    ${r.playTime  ? `<span class="tag">⏱ ${r.playTime}分</span>` : ''}
-                    ${r.types     ? `<span class="tag bl">${r.types}</span>` : ''}
-                    ${r.location  ? `<span class="tag gn">📍 ${escapeHtml(r.location)}</span>` : ''}
-                </div>`;
+            const date = document.createElement('div');
+            date.className   = 'history-date';
+            date.textContent = r.date;
+            const tags = document.createElement('div');
+            tags.className = 'history-tags';
+            if (r.playTime) tags.appendChild(makeTag('⏱ ' + r.playTime + '分'));
+            if (r.types)    tags.appendChild(makeTag(r.types, 'bl'));
+            if (r.location) tags.appendChild(makeTag('📍 ' + r.location, 'gn'));
+            div.appendChild(date);
+            div.appendChild(tags);
             list.appendChild(div);
         });
     }

@@ -14,11 +14,12 @@ import { collection, addDoc }          from "https://www.gstatic.com/firebasejs/
 /* ===================== CSVエクスポート ===================== */
 
 window.exportToCSV = function () {
+    /* memo列を追加して export → import で内容が消えないようにする */
     const rows = [
-        ['日付', '名前', '施光時間（分）', '施光の種類', '施光場所', '記録日時'],
+        ['日付', '名前', '施光時間（分）', '施光の種類', '施光場所', 'メモ', '記録日時'],
         ...[...state.records].sort((a, b) => b.date.localeCompare(a.date))
             .map(r => [r.date, r.person, r.playTime || '', r.types || '', r.location || '',
-                new Date(r.timestamp).toLocaleString('ja-JP')])
+                r.memo || '', new Date(r.timestamp).toLocaleString('ja-JP')])
     ];
     downloadCSV(rows, '施光記録_' + getToday() + '.csv');
 };
@@ -33,14 +34,25 @@ window.exportReceiveToCSV = function () {
     downloadCSV(rows, '受光記録_' + getToday() + '.csv');
 };
 
-/* CSVの行配列をBOM付きファイルとしてダウンロードする */
+/* CSV1フィールドを安全にエスケープする
+ * - " は "" に変換（RFC4180準拠）
+ * - 先頭が = + - @ TAB CR の場合は ' を前置（CSVインジェクション/DDE対策） */
+function escapeCSVField(value) {
+    let s = (value === null || value === undefined) ? '' : String(value);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+}
+
+/* CSVの行配列をBOM付きファイルとしてダウンロードする
+ * 改行はCRLF（RFC4180準拠）、各フィールドは escapeCSVField でエンコード */
 function downloadCSV(rows, filename) {
-    const csv  = rows.map(r => r.map(f => '"' + f + '"').join(',')).join('\n');
+    const csv  = rows.map(r => r.map(escapeCSVField).join(',')).join('\r\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const a    = document.createElement('a');
     a.href     = URL.createObjectURL(blob);
     a.download = filename;
     a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 /* ===================== CSVインポート ===================== */
@@ -52,20 +64,30 @@ window.importCSV = function (type) {
     input.onchange = async e => {
         const file = e.target.files[0];
         if (!file) return;
-        const text  = await file.text();
-        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-        if (lines.length < 2) { alert('データがありません'); return; }
+        let text = await file.text();
+        /* BOMを除去（先頭にあれば）— RFC4180でUTF-8 CSVには付くことが多い */
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        const allRows = parseCSV(text);
+        if (allRows.length < 2) { alert('データがありません'); return; }
 
-        /* BOMを除去してヘッダ行をスキップ */
-        lines[0].replace(/^﻿/, '');
-        const rows = lines.slice(1).map(l => parseCSVLine(l));
+        /* ヘッダ行をスキップ。空行は parseCSV 側で除外済み */
+        const rows = allRows.slice(1);
+
+        /* CSVインジェクション対策で先頭に ' を付けていた場合は剥がす */
+        const stripQuote = s => (typeof s === 'string' && s.startsWith("'")) ? s.slice(1) : s;
 
         showLoading(true);
         let added = 0, skipped = 0;
         try {
             if (type === 'give') {
                 for (const row of rows) {
-                    const [date, person, playTime, types, location] = row;
+                    const date     = stripQuote(row[0]);
+                    const person   = stripQuote(row[1]);
+                    const playTime = stripQuote(row[2]);
+                    const types    = stripQuote(row[3]);
+                    const location = stripQuote(row[4]);
+                    /* memo列はバージョン互換のため任意。旧形式（5列）でも動く */
+                    const memo     = stripQuote(row[5] !== undefined && !looksLikeTimestamp(row[5]) ? row[5] : '');
                     if (!date || !person) continue;
                     /* 日付・名前・種類・場所が全一致する場合のみスキップ */
                     const exists = state.records.some(r =>
@@ -74,7 +96,8 @@ window.importCSV = function (type) {
                     if (exists) { skipped++; continue; }
                     const newRecord = {
                         uid: state.currentUser.uid, person, date,
-                        playTime: playTime || null, types: types || '', location: location || '',
+                        playTime: playTime || null, types: types || '',
+                        location: location || '', memo: memo || '',
                         timestamp: new Date().toISOString()
                     };
                     const docRef = await addDoc(collection(db, 'records'), newRecord);
@@ -84,7 +107,11 @@ window.importCSV = function (type) {
                 }
             } else {
                 for (const row of rows) {
-                    const [date, person, receiveTime, types, location] = row;
+                    const date        = stripQuote(row[0]);
+                    const person      = stripQuote(row[1]);
+                    const receiveTime = stripQuote(row[2]);
+                    const types       = stripQuote(row[3]);
+                    const location    = stripQuote(row[4]);
                     if (!date || !person) continue;
                     const exists = state.receiveRecords.some(r =>
                         r.date === date && r.person === person &&
@@ -109,22 +136,50 @@ window.importCSV = function (type) {
     input.click();
 };
 
-/* CSVの1行を配列に変換（ダブルクォート・カンマ対応） */
-function parseCSVLine(line) {
-    const result = [];
-    let current  = '';
+/* CSV全体をパースする（複数行フィールド対応・RFC4180準拠）
+ * 旧 parseCSVLine は quote 内の改行を扱えず壊れていたため置換。
+ * 戻り値: 行ごとの配列（各行はフィールド配列） */
+function parseCSV(text) {
+    const rows = [];
+    let row   = [];
+    let field = '';
     let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') {
-            if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
-            else inQuotes = !inQuotes;
-        } else if (ch === ',' && !inQuotes) {
-            result.push(current); current = '';
+    for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+            if (ch === '"') {
+                if (text[i + 1] === '"') { field += '"'; i++; }
+                else inQuotes = false;
+            } else {
+                field += ch;
+            }
         } else {
-            current += ch;
+            if (ch === '"') {
+                inQuotes = true;
+            } else if (ch === ',') {
+                row.push(field); field = '';
+            } else if (ch === '\r') {
+                /* CRLFのCRは捨てる（次のLFで行確定） */
+            } else if (ch === '\n') {
+                row.push(field); field = '';
+                if (row.some(f => f !== '')) rows.push(row);
+                row = [];
+            } else {
+                field += ch;
+            }
         }
     }
-    result.push(current);
-    return result;
+    /* 最後の行（末尾改行なし） */
+    if (field !== '' || row.length > 0) {
+        row.push(field);
+        if (row.some(f => f !== '')) rows.push(row);
+    }
+    return rows;
+}
+
+/* 旧形式CSV（memo列なし）の判定用：
+ * row[5] が「2024/1/2 10:00:00」のような日時に見えればタイムスタンプと見なし memo は空扱いにする */
+function looksLikeTimestamp(s) {
+    if (!s) return false;
+    return /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/.test(s);
 }

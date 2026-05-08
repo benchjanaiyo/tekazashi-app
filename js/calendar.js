@@ -7,7 +7,7 @@
  * ============================================================ */
 
 import { state } from './config.js';
-import { getToday, escapeHtml } from './utils.js';
+import { getToday } from './utils.js';
 
 /* カレンダーを再描画する（タブ切り替え時・月移動時に呼ばれる） */
 window.updateCalendar = function () {

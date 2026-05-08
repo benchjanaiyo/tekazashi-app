@@ -3,6 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CSP: 外部CDN/通信先を限定。XSSの外部スクリプト注入とデータ送信を最小化
+         （onclick属性を多用しているため script-src には 'unsafe-inline' が必要） -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src  'self' 'unsafe-inline' https://www.gstatic.com https://cdn.jsdelivr.net;
+        style-src   'self' 'unsafe-inline';
+        img-src     'self' data: https://lh3.googleusercontent.com https://www.gstatic.com https://em-content.zobj.net;
+        connect-src 'self' https://*.googleapis.com https://www.gstatic.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com;
+        frame-src   https://tekazashi-app.firebaseapp.com https://accounts.google.com;
+        base-uri    'self';
+        object-src  'none';
+    ">
     <title>手かざし記録</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -93,8 +105,7 @@
             <label class="form-label">👤 名前</label>
             <div class="input-row">
                 <div class="suggest-wrapper" style="flex:1;">
-                    <input type="text" id="person-name" placeholder="名前を入力" class="form-input"
-                        onkeypress="if(event.key==='Enter')addNewPerson()" autocomplete="off">
+                    <input type="text" id="person-name" placeholder="名前を入力" class="form-input" autocomplete="off">
                     <div id="person-name-suggest" class="suggest-dropdown hidden"></div>
                 </div>
                 <input type="text" id="play-time" value="10" placeholder="分" class="form-input input-time">
@@ -472,7 +483,7 @@
             <div class="settings-section-title">🔑 あなたのUID（管理者設定用）</div>
             <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
                 <code id="uid-display" style="font-size:12px;color:var(--gray-700);background:var(--gray-50);border:1px solid var(--gray-200);border-radius:6px;padding:6px 10px;flex:1;word-break:break-all;line-height:1.5;"></code>
-                <button onclick="copyUID()" style="padding:6px 12px;font-size:13px;background:var(--gray-200);border:none;border-radius:6px;cursor:pointer;white-space:nowrap;color:var(--gray-700);">コピー</button>
+                <button onclick="copyUID(event)" style="padding:6px 12px;font-size:13px;background:var(--gray-200);border:none;border-radius:6px;cursor:pointer;white-space:nowrap;color:var(--gray-700);">コピー</button>
             </div>
         </div>
         <div class="modal-footer">

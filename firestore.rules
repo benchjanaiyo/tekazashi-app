@@ -1,0 +1,80 @@
+/* ============================================================
+ * firestore.rules — Firestore セキュリティルール
+ *
+ * Firebase コンソール → Firestore → ルール にこの内容を貼り付ける。
+ * リポジトリにコミットしておくことで、
+ * 「実装」と「権限」を一元的にレビューできるようにする。
+ *
+ * 重要：ADMIN_UID は js/config.js と必ず一致させること。
+ * ============================================================ */
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* 認証済みユーザーかどうか */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /* 本人のドキュメントかどうか（uidフィールド一致） */
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    /* 管理者UIDの定義（js/config.js の ADMIN_UID と同期させる） */
+    function isAdmin() {
+      return isSignedIn() &&
+        request.auth.uid == 'VqV9qx9rgec1QyrUhg76OLDqThG3';
+    }
+
+    /* ========== 施光記録 ========== */
+    match /records/{docId} {
+      allow read:   if isOwner(resource.data.uid);
+      allow create: if isOwner(request.resource.data.uid);
+      allow update: if isOwner(resource.data.uid)
+                    && isOwner(request.resource.data.uid);
+      allow delete: if isOwner(resource.data.uid);
+    }
+
+    /* ========== 受光記録 ========== */
+    match /receiveRecords/{docId} {
+      allow read:   if isOwner(resource.data.uid);
+      allow create: if isOwner(request.resource.data.uid);
+      allow update: if isOwner(resource.data.uid)
+                    && isOwner(request.resource.data.uid);
+      allow delete: if isOwner(resource.data.uid);
+    }
+
+    /* ========== 人別メモ ========== */
+    match /personMemos/{docId} {
+      allow read:   if isOwner(resource.data.uid);
+      allow create: if isOwner(request.resource.data.uid);
+      allow update: if isOwner(resource.data.uid)
+                    && isOwner(request.resource.data.uid);
+      allow delete: if isOwner(resource.data.uid);
+    }
+
+    /* ========== お知らせ（全員読み・管理者のみ書き） ========== */
+    match /settings/{docId} {
+      allow read:  if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    /* ========== ユーザー個別設定（サブタイトル等） ========== */
+    match /userSettings/{userId} {
+      allow read:  if isOwner(userId);
+      allow write: if isOwner(userId);
+    }
+
+    /* ========== 利用状況ログ（本人書き・管理者のみ読み） ========== */
+    match /usageLogs/{userId} {
+      allow read:   if isAdmin();
+      allow list:   if isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isAdmin();
+    }
+  }
+}

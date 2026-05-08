@@ -13,9 +13,15 @@ export function convertToHalfWidth(str) {
     return str.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
 }
 
-/* XSS対策のHTMLエスケープ */
+/* XSS対策のHTMLエスケープ
+ * 属性内JSリテラル混入対策で ' (シングルクォート) も含める */
 export function escapeHtml(str) {
-    return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return (str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 /* チェックボックスから施光種類文字列を生成（例: "⑧ ⑦"） */

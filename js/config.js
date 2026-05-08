@@ -43,7 +43,8 @@ export const state = {
     editingReceiveRecord: null,
     editingMemo:          null,
     calFilter:            { mikunite: false, time10: false, type8: false, type7: false, type6: false, type1: false },
-    calMode:              'give'
+    calMode:              'give',
+    statsStartMonth:      null   /* 集計開始月 "YYYY-MM" or null（全期間） */
 };
 
 /* 施光種類ごとの標準時間（分）— チェック時に自動セットされる */

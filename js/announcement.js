@@ -16,8 +16,13 @@ export async function loadAnnouncement() {
     try {
         const snap = await getDoc(doc(db, 'settings', 'announcement'));
         if (snap.exists()) state.announcementData = snap.data();
-    } catch (e) { /* 取得失敗は無視 — バナーなしで続行 */ }
+    } catch (e) { console.warn('お知らせ取得に失敗:', e); /* バナーなしで続行 */ }
     renderBanner();
+}
+
+/* dismiss判定用に、メッセージ内容のフィンガープリントを生成 */
+function bannerFingerprint(msg) {
+    return 'announcementDismissed_' + (msg || '').slice(0, 100);
 }
 
 /* バナーとおしらせタブ表示を state.announcementData から再描画する */
@@ -26,7 +31,11 @@ export function renderBanner() {
     const isAdmin  = state.currentUser?.uid === ADMIN_UID;
     const hasActive = state.announcementData?.active && state.announcementData?.message;
 
-    if (!hasActive && !isAdmin) {
+    /* 同じメッセージを過去に「×」で閉じていたら再表示しない（管理者は除く） */
+    const dismissed = hasActive && !isAdmin &&
+        localStorage.getItem(bannerFingerprint(state.announcementData.message)) === '1';
+
+    if ((!hasActive && !isAdmin) || dismissed) {
         banner.classList.add('hidden');
     } else {
         const msgEl = document.getElementById('banner-message');
@@ -58,9 +67,12 @@ export function renderBanner() {
     if (noticeAdmin) noticeAdmin.classList.toggle('hidden', !isAdmin);
 }
 
-/* バナーを閉じる（非表示にするだけ、データは削除しない） */
+/* バナーを閉じる（非表示にするだけ、Firestore側のデータは消さない）
+ * 同じメッセージは localStorage で既読扱いにし、リロード後も再表示しない */
 window.dismissBanner = function () {
     document.getElementById('announcement-banner').classList.add('hidden');
+    const msg = state.announcementData?.message;
+    if (msg) localStorage.setItem(bannerFingerprint(msg), '1');
 };
 
 /* バナー編集モーダルを開く（管理者専用） */
