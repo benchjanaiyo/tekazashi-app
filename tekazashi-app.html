@@ -3,20 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- CSP: 外部CDN/通信先を限定。XSSの外部スクリプト注入とデータ送信を最小化
-         Firebase Auth は apis.google.com / www.google.com / *.firebaseapp.com の
-         スクリプトとフレームを動的に読み込むため許可が必要。
-         （onclick属性を多用しているため script-src には 'unsafe-inline' が必要） -->
-    <meta http-equiv="Content-Security-Policy" content="
-        default-src 'self';
-        script-src  'self' 'unsafe-inline' https://www.gstatic.com https://cdn.jsdelivr.net https://apis.google.com https://www.google.com https://*.firebaseapp.com;
-        style-src   'self' 'unsafe-inline';
-        img-src     'self' data: https://lh3.googleusercontent.com https://*.googleusercontent.com https://www.gstatic.com https://em-content.zobj.net https://www.gstatic.com/firebasejs/;
-        connect-src 'self' https://*.googleapis.com https://www.gstatic.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com;
-        frame-src   https://tekazashi-app.firebaseapp.com https://*.firebaseapp.com https://accounts.google.com https://apis.google.com;
-        base-uri    'self';
-        object-src  'none';
-    ">
     <title>手かざし記録</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
