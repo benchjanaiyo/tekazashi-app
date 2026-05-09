@@ -78,6 +78,7 @@ export function clearReceiveInputs() {
         document.getElementById(id).checked = false);
     document.getElementById('receive-type-custom').value = '';
     document.getElementById('receive-location').value = '';
+    document.getElementById('receive-memo').value = '';
     if (window._refreshReceivePersonSuggest) window._refreshReceivePersonSuggest();
 }
 

@@ -25,11 +25,12 @@ window.exportToCSV = function () {
 };
 
 window.exportReceiveToCSV = function () {
+    /* memo列を追加して export → import で内容が消えないようにする */
     const rows = [
-        ['日付', '施光者', '受光時間（分）', '受光内容', '場所', '記録日時'],
+        ['日付', '施光者', '受光時間（分）', '受光内容', '場所', 'メモ', '記録日時'],
         ...[...state.receiveRecords].sort((a, b) => b.date.localeCompare(a.date))
             .map(r => [r.date, r.person, r.receiveTime || '', r.types || '', r.location || '',
-                new Date(r.timestamp).toLocaleString('ja-JP')])
+                r.memo || '', new Date(r.timestamp).toLocaleString('ja-JP')])
     ];
     downloadCSV(rows, '受光記録_' + getToday() + '.csv');
 };
@@ -112,6 +113,8 @@ window.importCSV = function (type) {
                     const receiveTime = stripQuote(row[2]);
                     const types       = stripQuote(row[3]);
                     const location    = stripQuote(row[4]);
+                    /* memo列はバージョン互換のため任意。旧形式（5列）でも動く */
+                    const memo        = stripQuote(row[5] !== undefined && !looksLikeTimestamp(row[5]) ? row[5] : '');
                     if (!date || !person) continue;
                     const exists = state.receiveRecords.some(r =>
                         r.date === date && r.person === person &&
@@ -120,7 +123,7 @@ window.importCSV = function (type) {
                     const newRecord = {
                         uid: state.currentUser.uid, person, date,
                         receiveTime: receiveTime || null, types: types || '', location: location || '',
-                        timestamp: new Date().toISOString()
+                        memo: memo || '', timestamp: new Date().toISOString()
                     };
                     const docRef = await addDoc(collection(db, 'receiveRecords'), newRecord);
                     state.receiveRecords.push({ ...newRecord, id: docRef.id });

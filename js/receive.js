@@ -21,6 +21,7 @@ window.addReceiveRecord = async function () {
     const selectedDate = document.getElementById('receive-selected-date').value;
     const types        = getSelectedTypes('receive-type');
     const location     = document.getElementById('receive-location').value.trim();
+    const memo         = document.getElementById('receive-memo').value.trim();
     if (!personName || !selectedDate) { alert('名前と日付を入力してください'); return; }
     if (receiveTime && !/^\d+$/.test(receiveTime)) {
         alert('受光時間は数字で入力してください'); return;
@@ -30,7 +31,8 @@ window.addReceiveRecord = async function () {
         const newRecord = {
             uid: state.currentUser.uid, person: personName, date: selectedDate,
             receiveTime: receiveTime || null, types: types || '',
-            location: location || '', timestamp: new Date().toISOString()
+            location: location || '', memo: memo || '',
+            timestamp: new Date().toISOString()
         };
         const docRef = await addDoc(collection(db, 'receiveRecords'), newRecord);
         state.receiveRecords.push({ ...newRecord, id: docRef.id });
@@ -76,6 +78,7 @@ window.editReceiveRecord = function (record) {
         });
         if (remain.length) document.getElementById('edit-receive-type-custom').value = remain.join(' ');
     }
+    document.getElementById('edit-receive-memo').value = record.memo || '';
     window.openModal('edit-receive-modal');
 };
 
@@ -92,7 +95,8 @@ window.updateReceiveRecord = async function () {
         person, date,
         receiveTime: receiveTime || null,
         types:       getSelectedTypes('edit-receive-type'),
-        location:    document.getElementById('edit-receive-location').value.trim()
+        location:    document.getElementById('edit-receive-location').value.trim(),
+        memo:        document.getElementById('edit-receive-memo').value.trim()
     };
     showLoading(true);
     try {

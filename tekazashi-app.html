@@ -183,6 +183,12 @@
         </div>
 
         <div class="form-group">
+            <label class="form-label">📝 メモ</label>
+            <textarea id="receive-memo" placeholder="特記事項など（任意）" class="form-input"
+                rows="2" style="font-size:15px;resize:none;"></textarea>
+        </div>
+
+        <div class="form-group">
             <label class="form-label">📍 場所</label>
             <div class="suggest-wrapper">
                 <input type="text" id="receive-location" placeholder="例：自宅、道場、外出先" class="form-input" autocomplete="off">
@@ -371,7 +377,7 @@
             <input type="text" id="edit-type-custom" placeholder="その他" class="modal-input" style="margin-top:8px;">
         </div>
         <div class="modal-form-group"><label class="modal-label">施光場所</label><input type="text" id="edit-location" class="modal-input"></div>
-        <div class="modal-form-group"><label class="modal-label">メモ</label><input type="text" id="edit-memo" class="modal-input" placeholder="この施光についてのメモ"></div>
+        <div class="modal-form-group"><label class="modal-label">メモ</label><textarea id="edit-memo" class="memo-textarea" rows="2" placeholder="この施光についてのメモ"></textarea></div>
         <div class="modal-footer">
             <button onclick="hideEditModal()"  class="modal-cancel-btn">キャンセル</button>
             <button onclick="updateRecord()"   class="modal-submit-btn">更新</button>
@@ -397,6 +403,7 @@
             <input type="text" id="edit-receive-type-custom" placeholder="その他" class="modal-input" style="margin-top:8px;">
         </div>
         <div class="modal-form-group"><label class="modal-label">受光場所</label><input type="text" id="edit-receive-location" class="modal-input"></div>
+        <div class="modal-form-group"><label class="modal-label">メモ</label><textarea id="edit-receive-memo" class="memo-textarea" rows="2" placeholder="この受光についてのメモ"></textarea></div>
         <div class="modal-footer">
             <button onclick="hideEditReceiveModal()" class="modal-cancel-btn">キャンセル</button>
             <button onclick="updateReceiveRecord()"  class="modal-submit-btn green">更新</button>
