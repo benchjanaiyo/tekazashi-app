@@ -73,12 +73,19 @@ window.updateCalendar = function () {
     }
 };
 
-/* 日付をタップしたら施光タブに移動してその日の記録を表示 */
+/* 日付をタップしたらカレンダーのサブタブに応じたタブへ移動してその日の記録を表示
+ * - calMode='give'    → 施光タブ
+ * - calMode='receive' → 受光タブ */
 function selectCalendarDate(dateStr) {
     document.getElementById('selected-date').value         = dateStr;
     document.getElementById('receive-selected-date').value = dateStr;
-    window.showView('give');
-    setTimeout(() => window.updateTodaysGiveRecords && window.updateTodaysGiveRecords(), 100);
+    if (state.calMode === 'receive') {
+        window.showView('receive');
+        setTimeout(() => window.updateTodaysReceiveRecords && window.updateTodaysReceiveRecords(), 100);
+    } else {
+        window.showView('give');
+        setTimeout(() => window.updateTodaysGiveRecords && window.updateTodaysGiveRecords(), 100);
+    }
 }
 
 /* フィルターに一致するか判定する（C言語のフィルタ関数に相当） */

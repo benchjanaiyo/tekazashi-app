@@ -34,8 +34,15 @@ window.showView = function (viewName, animate) {
     currentTabIndex = TAB_ORDER.indexOf(viewName);
     moveSlider(currentTabIndex, animate === true);
     document.getElementById('tab-' + viewName).scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    if (viewName === 'calendar') setTimeout(() => window.updateCalendar && window.updateCalendar(), 50);
-    else if (viewName === 'stats') {
+    /* タブ表示時はそのタブの内容を必ず再描画して、日付入力欄の値（プログラム的に
+     * 書き換わっても change イベントは発火しないため）と表示のズレを防ぐ */
+    if (viewName === 'give') {
+        window.updateTodaysGiveRecords && window.updateTodaysGiveRecords();
+    } else if (viewName === 'receive') {
+        window.updateTodaysReceiveRecords && window.updateTodaysReceiveRecords();
+    } else if (viewName === 'calendar') {
+        setTimeout(() => window.updateCalendar && window.updateCalendar(), 50);
+    } else if (viewName === 'stats') {
         setTimeout(() => window.updateStats    && window.updateStats(), 50);
         setTimeout(() => window.loadUsageLogs  && window.loadUsageLogs(), 50);
     }
