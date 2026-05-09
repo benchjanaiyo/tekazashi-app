@@ -105,6 +105,7 @@ window.editRecord = function (record) {
         });
         if (remain.length) document.getElementById('edit-type-custom').value = remain.join(' ');
     }
+    document.getElementById('edit-memo').value = record.memo || '';
     window.openModal('edit-modal');
 };
 
@@ -121,7 +122,8 @@ window.updateRecord = async function () {
         person, date,
         playTime: playTime || null,
         types:    getSelectedTypes('edit-type'),
-        location: document.getElementById('edit-location').value.trim()
+        location: document.getElementById('edit-location').value.trim(),
+        memo:     document.getElementById('edit-memo').value.trim()
     };
     showLoading(true);
     try {
