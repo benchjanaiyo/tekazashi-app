@@ -188,6 +188,14 @@ function buildRecordCard(record, kind) {
     if (record.location) tags.appendChild(makeTag('📍 ' + record.location, 'green'));
     info.appendChild(tags);
 
+    /* メモがあれば黄色ボックスで表示（改行・長文も保持） */
+    if (record.memo) {
+        const memoBox = document.createElement('div');
+        memoBox.style.cssText = 'font-size:13px;color:var(--gray-600);margin-top:6px;padding:4px 8px;background:#fef9c3;border-radius:6px;white-space:pre-wrap;word-break:break-word;';
+        memoBox.textContent   = '📝 ' + record.memo;
+        info.appendChild(memoBox);
+    }
+
     const actions = document.createElement('div');
     actions.className = 'record-actions';
     const editBtn = document.createElement('button');

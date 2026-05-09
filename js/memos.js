@@ -52,7 +52,7 @@ function renderPersonHistory(personName) {
         right.appendChild(tags);
         if (r.memo) {
             const memoBox = document.createElement('div');
-            memoBox.style.cssText = 'font-size:13px;color:var(--gray-600);margin-top:4px;padding:4px 6px;background:#fef9c3;border-radius:6px;';
+            memoBox.style.cssText = 'font-size:13px;color:var(--gray-600);margin-top:4px;padding:4px 6px;background:#fef9c3;border-radius:6px;white-space:pre-wrap;word-break:break-word;';
             memoBox.textContent   = '📝 ' + r.memo;
             right.appendChild(memoBox);
         }
