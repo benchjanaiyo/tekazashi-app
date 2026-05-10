@@ -9,7 +9,8 @@
 
 import { db, state }                   from './config.js';
 import { showLoading, saveLocationHistory, getToday } from './utils.js';
-import { collection, addDoc }          from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, addDoc, doc,
+         deleteDoc }                   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 /* ===================== CSVエクスポート ===================== */
 
@@ -186,3 +187,59 @@ function looksLikeTimestamp(s) {
     if (!s) return false;
     return /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/.test(s);
 }
+
+/* ===================== 指定日以前のデータを一括削除 =====================
+ * CSVインポート失敗時などのリカバリ用途。基準日を含めて、それ以前の
+ * records / receiveRecords を Firestore からまとめて削除する。
+ * personMemos には影響しない。 */
+window.deleteRecordsBeforeDate = async function () {
+    const beforeDate    = document.getElementById('delete-before-date-input').value;
+    const targetGive    = document.getElementById('delete-target-give').checked;
+    const targetReceive = document.getElementById('delete-target-receive').checked;
+    if (!beforeDate)                       { alert('基準日を選択してください'); return; }
+    if (!targetGive && !targetReceive)     { alert('削除対象（施光/受光）を選択してください'); return; }
+
+    /* date は "YYYY-MM-DD" 文字列なので辞書順比較で日付順に等しい */
+    const giveTargets    = targetGive    ? state.records.filter(r => r.date <= beforeDate)        : [];
+    const receiveTargets = targetReceive ? state.receiveRecords.filter(r => r.date <= beforeDate) : [];
+    const total = giveTargets.length + receiveTargets.length;
+    if (total === 0) { alert('削除対象の記録はありません'); return; }
+
+    const lines = [`${beforeDate} 以前の`];
+    if (targetGive)    lines.push(`・施光記録: ${giveTargets.length}件`);
+    if (targetReceive) lines.push(`・受光記録: ${receiveTargets.length}件`);
+    lines.push(`合計 ${total}件を削除します。`);
+    lines.push('この操作は元に戻せません。よろしいですか？');
+    if (!confirm(lines.join('\n'))) return;
+
+    showLoading(true);
+    let deleted = 0, failed = 0;
+    try {
+        const giveResults = await Promise.allSettled(
+            giveTargets.map(r => deleteDoc(doc(db, 'records', r.id)))
+        );
+        const giveOkIds = new Set();
+        giveResults.forEach((res, i) => {
+            if (res.status === 'fulfilled') { giveOkIds.add(giveTargets[i].id); deleted++; }
+            else failed++;
+        });
+        if (giveOkIds.size) state.records = state.records.filter(r => !giveOkIds.has(r.id));
+
+        const recvResults = await Promise.allSettled(
+            receiveTargets.map(r => deleteDoc(doc(db, 'receiveRecords', r.id)))
+        );
+        const recvOkIds = new Set();
+        recvResults.forEach((res, i) => {
+            if (res.status === 'fulfilled') { recvOkIds.add(receiveTargets[i].id); deleted++; }
+            else failed++;
+        });
+        if (recvOkIds.size) state.receiveRecords = state.receiveRecords.filter(r => !recvOkIds.has(r.id));
+
+        window.updateDisplay();
+        document.getElementById('delete-before-date-input').value = '';
+        alert(`削除完了\n削除: ${deleted}件${failed ? `\n失敗: ${failed}件` : ''}`);
+    } catch (e) {
+        alert('削除中にエラーが発生しました: ' + e.message);
+    }
+    showLoading(false);
+};
